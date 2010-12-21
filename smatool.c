@@ -542,7 +542,7 @@ int main(int argc, char **argv)
           printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
         }
 
-	if (verbose ==1) printf("Adress %s\n",dest);
+	if (verbose ==1) printf("Address %s\n",dest);
 
         if (file ==1)
 	  fp=fopen(config,"r");
@@ -870,7 +870,7 @@ while (!feof(fp)){
 				}
 
 			} while (strcmp(lineread,"$END"));
-			if (verbose == 2){ 
+			if (verbose == 1){ 
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
 			   printf("\n\n");
 			}
