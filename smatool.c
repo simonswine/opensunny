@@ -175,7 +175,7 @@ tryfcs16(unsigned char *cp, int len)
 
     memcpy( stripped, cp, len );
     /* add on output */
-    if (verbose ==1){
+    if (verbose ==2){
  	printf("String to calculate FCS\n");	 
         	for (i=0;i<len;i++) printf("%02x ",cp[i]);
 	 	printf("\n\n");
@@ -186,7 +186,7 @@ tryfcs16(unsigned char *cp, int len)
     fl[cc] = (trialfcs & 0x00ff);    /* least significant byte first */
     fl[cc+1] = ((trialfcs >> 8) & 0x00ff);
     cc+=2;
-    if (verbose == 1 ){ 
+    if (verbose == 2 ){ 
 	printf("FCS = %x%x %x\n",(trialfcs & 0x00ff),((trialfcs >> 8) & 0x00ff), trialfcs); 
     }
 }
@@ -374,6 +374,70 @@ char * sunset( float latitude, float longitude )
    sprintf( returntime, "%02.0f:%02.0f",floor(localT),(localT-floor(localT))*60 ); 
    return returntime;
 }
+
+int todays_almanac( char * server, char * user, char * password, char * database )
+/*  Check if sunset and sunrise have been set today */
+{
+    int	        found=0;
+    MYSQL_ROW 	row;
+    char 	SQLQUERY[200];
+
+    OpenMySqlDatabase( server, user, password, database);
+    //Get Start of day value
+    sprintf(SQLQUERY,"SELECT sunrise FROM Almanac WHERE date=DATE_FORMAT( NOW(), \"%%Y%%m%%d\" ) " );
+    if (verbose == 1) printf("%s\n",SQLQUERY);
+    DoQuery(SQLQUERY);
+    if (row = mysql_fetch_row(res))  //if there is a result, update the row
+    {
+       found=1;
+    }
+    mysql_close(conn);
+    return found;
+}
+
+void update_almanac( char * server, char * user, char * password, char * database, char * sunrise, char * sunset )
+{
+    MYSQL_ROW 	row;
+    char 	SQLQUERY[200];
+
+    OpenMySqlDatabase( server, user, password, database);
+    //Get Start of day value
+    sprintf(SQLQUERY,"INSERT INTO Almanac SET sunrise=CONCAT(DATE_FORMAT( NOW(), \"%%Y-%%m-%%d \"),\"%s\"), sunset=CONCAT(DATE_FORMAT( NOW(), \"%%Y-%%m-%%d \"),\"%s\" ), date=NOW() ", sunrise, sunset );
+    if (verbose == 1) printf("%s\n",SQLQUERY);
+    DoQuery(SQLQUERY);
+    mysql_close(conn);
+}
+
+int is_light( char * server, char * user, char * password, char * database )
+/*  Check if all data done and past sunset or before sunrise */
+{
+    int	        light=1;
+    MYSQL_ROW 	row;
+    char 	SQLQUERY[200];
+
+    OpenMySqlDatabase( server, user, password, database);
+    //Get Start of day value
+    sprintf(SQLQUERY,"SELECT if(sunrise < NOW(),1,0) FROM Almanac WHERE date= DATE_FORMAT( NOW(), \"%%Y-%%m-%%d\" ) " );
+    if (verbose == 1) printf("%s\n",SQLQUERY);
+    DoQuery(SQLQUERY);
+    if (row = mysql_fetch_row(res))  //if there is a result, update the row
+    {
+       if( atoi( (char *)row[0] ) == 0 ) light=0;
+    }
+    if( light ) {
+       sprintf(SQLQUERY,"SELECT if( dd.datetime > al.sunset,1,0) FROM DayData as dd left join Almanac as al on al.date=DATE(dd.datetime) WHERE 1 ORDER BY dd.datetime DESC limit 1" );
+       if (verbose == 1) printf("%s\n",SQLQUERY);
+       DoQuery(SQLQUERY);
+       if (row = mysql_fetch_row(res))  //if there is a result, update the row
+       {
+          if( atoi( (char *)row[0] ) == 1 ) light=0;
+       }
+    }
+    
+    mysql_close(conn);
+    return light;
+}
+
 int main(int argc, char **argv)
 {
 	FILE *fp;
@@ -536,11 +600,17 @@ int main(int argc, char **argv)
 					}
 				}
 		}
-        if((lon==1)&&(lat==1)) {
-          sprintf( sunrise_time, "%s", sunrise(latitude_f,longitude_f ));
-          sprintf( sunset_time, "%s", sunset(latitude_f, longitude_f ));
-          printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
+        if((lon==1)&&(lat==1)&&(mysql==1)) {
+          if( ! todays_almanac( server, user, password, database ) ) {
+             sprintf( sunrise_time, "%s", sunrise(latitude_f,longitude_f ));
+             sprintf( sunset_time, "%s", sunset(latitude_f, longitude_f ));
+             printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
+             update_almanac(  server, user, password, database, sunrise_time, sunset_time );
+          }
         }
+        if((lon==0)||(lat==0)||(mysql==0)||is_light(  server, user, password, database ))
+        {
+
 
 	if (verbose ==1) printf("Address %s\n",dest);
 
@@ -650,7 +720,7 @@ while (!feof(fp)){
                             else
 			      if (memcmp(fl,received,cc) == 0){
 				  found = 1;
-				  if (verbose == 1) printf("Found string we are waiting for\n\n"); 
+				  if (verbose == 1) printf("Found string we are waiting for\n"); 
 			      }
 			} while (found == 0);
 			if (verbose == 1){ 
@@ -659,6 +729,7 @@ while (!feof(fp)){
 			}
 		}
 		if(!strcmp(lineread,"S")){		//See if line is something we need to send
+			if (verbose	== 1) printf("Sending\n");
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -1131,7 +1202,7 @@ if ((post ==1)&&(sid==1)&&(key==1)){
               hour = loctime->tm_hour;
               minute = loctime->tm_min; 
               second = loctime->tm_sec; 
-	      ret=sprintf(compurl,"%s?d=%i%i%i&t=%i:%i&v1=%f&v2=%f&key=%s&sid=%s",url,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,pvoutputkey,pvoutputsid);
+	      ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",url,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,pvoutputkey,pvoutputsid);
               sprintf(SQLQUERY,"SELECT PVOutput FROM DayData WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  and PVOutput IS NOT NULL", year, month, day, hour, minute, second );
               if (verbose == 1) printf("%s\n",SQLQUERY);
               DoQuery(SQLQUERY);
@@ -1170,6 +1241,7 @@ if ((post ==1)&&(sid==1)&&(key==1)){
 close(s);
 free(archdatalist);
 return 0;
+}
 }
 
 int
