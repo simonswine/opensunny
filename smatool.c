@@ -15,7 +15,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 
-/* compile gcc -lbluetooth -lcurl -lmysqlclient -o smatool smatool.c */
+/* compile gcc -lbluetooth -lcurl -lmysqlclient -g -o smatool smatool.c */
 
 
 #include <stdio.h>
@@ -452,6 +452,7 @@ int main(int argc, char **argv)
         int togo=0;
         int  initstarted=0,setupstarted=0,rangedatastarted=0;
         long returnpos;
+        int returnline;
 	char dest[18];
 	char url[100];
 	char datefrom[100];
@@ -484,6 +485,7 @@ int main(int argc, char **argv)
 	char chan[1];
 	float currentpower;
         int   rr;
+	int linenum = 0;
 	float dtotal;
 	float gtotal;
 	float ptotal;
@@ -651,9 +653,10 @@ int main(int argc, char **argv)
 while (!feof(fp)){	
         start:
 	if (fgets(line,400,fp) != NULL){				//read line from sma.in
+		linenum++;
 		lineread = strtok(line," ;");
 		if(!strcmp(lineread,"R")){		//See if line is something we need to receive
-			if (verbose	== 1) printf("Waiting for string\n");
+			if (verbose	== 1) printf("[%d] Waiting for string\n",linenum);
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -699,13 +702,14 @@ while (!feof(fp)){
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
 			   printf("\n\n");
 			}
-			if (verbose == 1) printf("Waiting for data on rfcomm\n");
+			if (verbose == 1) printf("[%d] Waiting for data on rfcomm\n",linenum);
 			found = 0;
 			do {
                             rr=0;
                             if( read_bluetooth( &s, &rr, received ) != 0 )
                             {
                                fseek( fp, returnpos, 0 );
+                               linenum = returnline;
                                found=0;
                                if( archdatalen > 0 )
                                   free( archdatalist );
@@ -729,7 +733,7 @@ while (!feof(fp)){
 			}
 		}
 		if(!strcmp(lineread,"S")){		//See if line is something we need to send
-			if (verbose	== 1) printf("Sending\n");
+			if (verbose	== 1) printf("[%d] Sending\n",linenum);
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -950,7 +954,7 @@ while (!feof(fp)){
 
 
 		if(!strcmp(lineread,"E")){		//See if line is something we need to extract
-			if (verbose	== 1) printf("Extracting\n");
+			if (verbose	== 1) printf("[%d] Extracting\n",linenum);
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -962,7 +966,7 @@ while (!feof(fp)){
                                 serial[2]=received[77];
                                 serial[1]=received[76];
                                 serial[0]=received[75];
-			        if (verbose	== 1) printf( "serial=%x:%x:%x:%x\n",serial[3],serial[2],serial[1],serial[0] ); 
+			        if (verbose	== 1) printf( "serial=%02x:%02x:%02x:%02x\n",serial[3]&0xff,serial[2]&0xff,serial[1]&0xff,serial[0]&0xff ); 
                                 break;
                                 
 				case 9: // extract Time from Inverter
@@ -1131,7 +1135,6 @@ while (!feof(fp)){
 				strength  = (received[22] * 100.0)/0xff;
 	                        if (verbose == 1) {
                                     printf("bluetooth signal  = %.0f%\n",strength);
-                                    getchar();
                                 }
                                 break;		
 				
@@ -1143,14 +1146,17 @@ while (!feof(fp)){
 		if(!strcmp(lineread,":init")){		//See if line is something we need to extract
                    initstarted=1;
                    returnpos=ftell(fp);
+		   returnline = linenum;
                 }
 		if(!strcmp(lineread,":setup")){		//See if line is something we need to extract
                    setupstarted=1;
                    returnpos=ftell(fp);
+		   returnline = linenum;
                 }
 		if(!strcmp(lineread,":getrangedata")){		//See if line is something we need to extract
                    rangedatastarted=1;
                    returnpos=ftell(fp);
+		   returnline = linenum;
                 }
 	}
 }
