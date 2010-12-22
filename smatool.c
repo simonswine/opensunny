@@ -205,11 +205,13 @@ fix_length_received(unsigned char *received, int *len)
       printf( "sum=%x", sum );
       delta = (*len) - received[1];
       printf( "length change from %x to %x\n", received[1], (*len) );
-      received[1] = (*len);
-      switch( received[1] ) {
-        case 0x52: received[3]=0x2c; break;
-        case 0x6a: received[3]=0x14; break;
-        default:  received[3]=sum-received[1]; break;
+      if( received[3] != 0x13 ) { 
+        received[1] = (*len);
+        switch( received[1] ) {
+          case 0x52: received[3]=0x2c; break;
+          case 0x6a: received[3]=0x14; break;
+          default:  received[3]=sum-received[1]; break;
+        }
       }
     }
 }
@@ -1145,7 +1147,7 @@ while (!feof(fp)){
 				         gtotal = (datarecord[6] * 65536) + (datarecord[5] * 256) + datarecord[4];
                                          if( ptotal == 0 )
                                             ptotal = gtotal;
-	                                 if (verbose == 1) printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12);
+	                                 if (verbose == 1) printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts togo=%d", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12, togo);
                                          if( archdatalen == 0 )
                                             archdatalist = (struct archdata_type *)malloc( sizeof( struct archdata_type ) );
                                          else
