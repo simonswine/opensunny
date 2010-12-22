@@ -164,6 +164,57 @@ add_escapes(unsigned char *cp, int *len)
 }
 
 /*
+ * Recalculate and update length to correct for escapes
+ */
+fix_length_send(unsigned char *cp, int *len)
+{
+    int	    delta=0;
+
+    if(( cp[1] != (*len)+1 ))
+    {
+      delta = (*len)+1 - cp[1];
+      printf( "sum=%x", cp[1]+cp[3] );
+      printf( "length change from %x to %x \n", cp[1],(*len)+1 );
+      cp[1] =(*len)+1;
+      switch( cp[1] ) {
+        case 0x55: cp[3]=0x2b; break;
+        case 0x54: cp[3]=0x2a; break;
+        case 0x53: cp[3]=0x2d; break;
+        case 0x5e: cp[3]=0x20; break;
+        case 0x5c: cp[3]=0x22; break;
+        case 0x40: cp[3]=0x3e; break;
+        case 0x41: cp[3]=0x3f; break;
+        case 0x42: cp[3]=0x3d; break;
+        case 0x60: cp[3]=0x20; break;
+        default: printf( "NO CONVERSION!" );getchar();break;
+      }
+    }
+}
+            
+/*
+ * Recalculate and update length to correct for escapes
+ */
+fix_length_received(unsigned char *received, int *len)
+{
+    int	    delta=0;
+    int	    sum;
+
+    if( received[1] != (*len) )
+    {
+      sum = received[1]+received[3];
+      printf( "sum=%x", sum );
+      delta = (*len) - received[1];
+      printf( "length change from %x to %x\n", received[1], (*len) );
+      received[1] = (*len);
+      switch( received[1] ) {
+        case 0x52: received[3]=0x2c; break;
+        case 0x6a: received[3]=0x14; break;
+        default:  received[3]=sum-received[1]; break;
+      }
+    }
+}
+
+/*
  * How to use the fcs
  */
 tryfcs16(unsigned char *cp, int len)
@@ -425,7 +476,7 @@ int is_light( char * server, char * user, char * password, char * database )
        if( atoi( (char *)row[0] ) == 0 ) light=0;
     }
     if( light ) {
-       sprintf(SQLQUERY,"SELECT if( dd.datetime > al.sunset,1,0) FROM DayData as dd left join Almanac as al on al.date=DATE(dd.datetime) WHERE 1 ORDER BY dd.datetime DESC limit 1" );
+       sprintf(SQLQUERY,"SELECT if( dd.datetime > al.sunset,1,0) FROM DayData as dd left join Almanac as al on al.date=DATE(dd.datetime) and al.date=DATE(NOW()) WHERE 1 ORDER BY dd.datetime DESC LIMIT 1" );
        if (verbose == 1) printf("%s\n",SQLQUERY);
        DoQuery(SQLQUERY);
        if (row = mysql_fetch_row(res))  //if there is a result, update the row
@@ -513,6 +564,7 @@ int main(int argc, char **argv)
    memset(inverter_pass,0,13);
    /* get the report time - used in various places */
    reporttime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
+   //reporttime = 1292823628;
    
      for (i=1;i<argc;i++)			//Read through passed arguments
       {
@@ -721,11 +773,19 @@ while (!feof(fp)){
                                  exit(-1);
                                goto start;
                             }
-                            else
+                            else {
+			      if (verbose == 1){ 
+				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
+                                printf( "\n" );
+				for (i=0;i<rr;i++) printf("%02x ",received[i]);
+			        printf("\n\n");
+			      }
+                           
 			      if (memcmp(fl,received,cc) == 0){
 				  found = 1;
 				  if (verbose == 1) printf("Found string we are waiting for\n"); 
 			      }
+                            }
 			} while (found == 0);
 			if (verbose == 1){ 
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
@@ -805,6 +865,7 @@ while (!feof(fp)){
 				case 4: //$crc
 				tryfcs16(fl+19, cc -19);
                                 add_escapes(fl,&cc);
+                                fix_length_send(fl,&cc);
 				break;
 
 				case 8: // $CHAN
@@ -946,7 +1007,15 @@ while (!feof(fp)){
 
 			} while (strcmp(lineread,"$END"));
 			if (verbose == 1){ 
-				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
+                                printf( "%08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
+                                j=12;
+				for (i=0;i<cc;i++) {
+                                   if( j%16== 0 )
+                                      printf( "\n%08x: ",j);
+                                   printf("%02x ",fl[i]);
+                                   j++;
+                                }
+                           printf(" cc=%d",cc);
 			   printf("\n\n");
 			}
 			write(s,fl,cc);
@@ -1016,7 +1085,7 @@ while (!feof(fp)){
 				break;
 
 				case 12: // extract time strings $TIMESTRING
-				memcpy(timestr,received+62,25);
+				memcpy(timestr,received+63,24);
 				if (verbose == 1) printf("extracting timestring\n");
                                 
 				break;
@@ -1253,13 +1322,13 @@ return 0;
 int
 read_bluetooth( int *s, int *rr, unsigned char *received )
 {
-    int bytes_read,i;
+    int bytes_read,i,j;
     unsigned char buf[1024]; //read buffer
     unsigned char header[3]; //read buffer
     struct timeval tv;
     fd_set readfds;
 
-    tv.tv_sec = 5; // set timeout of reading to 5 seconds
+    tv.tv_sec = 30; // set timeout of reading to 5 seconds
     tv.tv_usec = 0;
     memset(buf,0,1024);
 
@@ -1296,7 +1365,25 @@ read_bluetooth( int *s, int *rr, unsigned char *received )
        return -1;
     }
     if ( bytes_read > 0){
-        if (verbose == 1) printf("Data received on rfcomm\n");
+        if (verbose == 1) printf("\nReceiving\n");
+	if (verbose == 1){ 
+           printf( "%08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
+           j=12;
+           for( i=0; i<sizeof(header); i++ ) {
+              if( j%16== 0 )
+                 printf( "\n%08x: ",j);
+              printf("%02x ",header[i]);
+              j++;
+           }
+	   for (i=0;i<bytes_read;i++) {
+              if( j%16== 0 )
+                 printf( "\n%08x: ",j);
+              printf("%02x ",buf[i]);
+              j++;
+           }
+           printf(" rr=%d",(bytes_read+(*rr)));
+	   printf("\n\n");
+   }
         for (i=0;i<bytes_read;i++){ //start copy the rec buffer in to received
             if (buf[i] == 0x7d){ //did we receive the escape char
 	        switch (buf[i+1]){   // act depending on the char after the escape char
@@ -1321,6 +1408,11 @@ read_bluetooth( int *s, int *rr, unsigned char *received )
 	    if (verbose == 1) printf("%02x ", received[(*rr)]);
 	    (*rr)++;
 	}
+        fix_length_received( received, rr );
+	if (verbose == 1) {
+	    printf("\n");
+            for( i=0;i<(*rr); i++ ) printf("%02x ", received[(i)]);
+        }
 	if (verbose == 1) printf("\n\n");
     }	
     return 0;
