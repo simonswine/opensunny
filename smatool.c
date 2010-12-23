@@ -177,15 +177,18 @@ fix_length_send(unsigned char *cp, int *len)
       printf( "  length change from %x to %x \n", cp[1],(*len)+1 );
       cp[1] =(*len)+1;
       switch( cp[1] ) {
-        case 0x55: cp[3]=0x2b; break;
-        case 0x54: cp[3]=0x2a; break;
-        case 0x53: cp[3]=0x2d; break;
-        case 0x5e: cp[3]=0x20; break;
-        case 0x5c: cp[3]=0x22; break;
         case 0x40: cp[3]=0x3e; break;
         case 0x41: cp[3]=0x3f; break;
-        case 0x42: cp[3]=0x3d; break;
-        case 0x60: cp[3]=0x20; break;
+        case 0x42: cp[3]=0x3c; break;
+        case 0x53: cp[3]=0x2d; break;
+        case 0x54: cp[3]=0x2a; break;
+        case 0x55: cp[3]=0x2b; break;
+        case 0x5c: cp[3]=0x22; break;
+        case 0x5e: cp[3]=0x20; break;
+        case 0x5f: cp[3]=0x21; break;
+        case 0x60: cp[3]=0x1e; break;
+        case 0x61: cp[3]=0x1f; break;
+        case 0x62: cp[3]=0x1e; break;
         default: printf( "NO CONVERSION!" );getchar();break;
       }
     }
@@ -1127,7 +1130,7 @@ while (!feof(fp)){
 				
 				case 18: // $ARCHIVEDATA1
                                 i=59;
-                                togo=received[43];
+                                togo=received[43]+256*received[44];
                                 last=0;
                                 finished=0;
                                 crc_at_end=0;
@@ -1173,7 +1176,21 @@ while (!feof(fp)){
                                            last = 0;
                                            break;
                                         }
-                                        read_bluetooth( &s, &rr, received );
+                                        if( read_bluetooth( &s, &rr, received ) != 0 )
+                                        {
+                                           fseek( fp, returnpos, 0 );
+                                           linenum = returnline;
+                                           found=0;
+                                           if( archdatalen > 0 )
+                                              free( archdatalist );
+                                           archdatalen=0;
+                                           strcpy( lineread, "" );
+                                           sleep(10);
+                                           failedbluetooth++;
+                                           if( failedbluetooth > 3 )
+                                             exit(-1);
+                                           goto start;
+                                        }
                                     
 					switch ( received[3] ) {
                                         
@@ -1183,7 +1200,7 @@ while (!feof(fp)){
                                               i=59;
                                               crc_at_end = 0;
                                               j=0;
-                                              togo=received[43];
+                                              togo=received[43]+256*received[44];
                                            }
                                            else
                                              i=18;
@@ -1336,7 +1353,7 @@ read_bluetooth( int *s, int *rr, unsigned char *received )
     struct timeval tv;
     fd_set readfds;
 
-    tv.tv_sec = 30; // set timeout of reading to 5 seconds
+    tv.tv_sec = 10; // set timeout of reading to 5 seconds
     tv.tv_usec = 0;
     memset(buf,0,1024);
 
