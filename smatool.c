@@ -174,7 +174,7 @@ fix_length_send(unsigned char *cp, int *len)
     {
       delta = (*len)+1 - cp[1];
       printf( "sum=%x", cp[1]+cp[3] );
-      printf( "length change from %x to %x \n", cp[1],(*len)+1 );
+      printf( "  length change from %x to %x \n", cp[1],(*len)+1 );
       cp[1] =(*len)+1;
       switch( cp[1] ) {
         case 0x40: cp[3]=0x3e; break;
@@ -756,6 +756,7 @@ while (!feof(fp)){
 
 			} while (strcmp(lineread,"$END"));
 			if (verbose == 1){ 
+				printf("[%d]   waiting for: ");
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
 			   printf("\n\n");
 			}
@@ -780,15 +781,19 @@ while (!feof(fp)){
                             }
                             else {
 			      if (verbose == 1){ 
+                                printf( "  [%d] looking for: ",linenum);
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
                                 printf( "\n" );
+                                printf( "  [%d] received:    ",linenum);
 				for (i=0;i<rr;i++) printf("%02x ",received[i]);
 			        printf("\n\n");
 			      }
                            
 			      if (memcmp(fl,received,cc) == 0){
 				  found = 1;
-				  if (verbose == 1) printf("Found string we are waiting for\n"); 
+				  if (verbose == 1) printf("[%d] Found string we are waiting for\n",linenum); 
+			      } else {
+				  if (verbose == 1) printf("[%d] Did not find string\n",linenum); 
 			      }
                             }
 			} while (found == 0);
@@ -1012,11 +1017,12 @@ while (!feof(fp)){
 
 			} while (strcmp(lineread,"$END"));
 			if (verbose == 1){ 
-                                printf( "%08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
+				printf( "  [%d] sending:\n",linenum);
+                                printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
                                 j=12;
 				for (i=0;i<cc;i++) {
                                    if( j%16== 0 )
-                                      printf( "\n%08x: ",j);
+                                      printf( "\n    %08x: ",j);
                                    printf("%02x ",fl[i]);
                                    j++;
                                 }
@@ -1386,17 +1392,17 @@ read_bluetooth( int *s, int *rr, unsigned char *received )
     if ( bytes_read > 0){
         if (verbose == 1) printf("\nReceiving\n");
 	if (verbose == 1){ 
-           printf( "%08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
+           printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
            j=12;
            for( i=0; i<sizeof(header); i++ ) {
               if( j%16== 0 )
-                 printf( "\n%08x: ",j);
+                 printf( "\n    %08x: ",j);
               printf("%02x ",header[i]);
               j++;
            }
 	   for (i=0;i<bytes_read;i++) {
               if( j%16== 0 )
-                 printf( "\n%08x: ",j);
+                 printf( "\n    %08x: ",j);
               printf("%02x ",buf[i]);
               j++;
            }
