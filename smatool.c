@@ -205,10 +205,10 @@ fix_length_received(unsigned char *received, int *len)
     if( received[1] != (*len) )
     {
       sum = received[1]+received[3];
-      printf( "sum=%x", sum );
+      if (verbose == 1) printf( "sum=%x", sum );
       delta = (*len) - received[1];
-      printf( "length change from %x to %x\n", received[1], (*len) );
-      if( received[3] != 0x13 ) { 
+      if (verbose == 1) printf( "length change from %x to %x\n", received[1], (*len) );
+      if(( received[3] != 0x13 )&&( received[3] != 0x14 )) { 
         received[1] = (*len);
         switch( received[1] ) {
           case 0x52: received[3]=0x2c; break;
