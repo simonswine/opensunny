@@ -64,7 +64,8 @@ char *accepted_strings[] = {
 "$TESTDATA",
 "$ARCHIVEDATA1",
 "$PASSWORD",
-"$SIGNAL"
+"$SIGNAL",
+"$UNKNOWN"
 };
 
 int cc,verbose = 0;
@@ -525,6 +526,7 @@ int main(int argc, char **argv)
 	char address2[6] = { 0 };
 	char timestr[25] = { 0 };
 	char serial[4] = { 0 };
+	char unknown[4] = { 0x12,0x1a,0xd9,0x38 };
 	char *lineread;
 	time_t curtime;
 	time_t reporttime;
@@ -1010,6 +1012,13 @@ while (!feof(fp)){
 				}
 				break;	
 
+				case 21: // $UNKNOWN
+				for (i=0;i<4;i++){
+			            fl[cc] = unknown[i];
+				    cc++;
+				}
+                                break;
+
 				default :
 				fl[cc] = conv(lineread);
 				cc++;
@@ -1231,7 +1240,6 @@ while (!feof(fp)){
                                     printf("bluetooth signal  = %.0f%\n",strength);
                                 }
                                 break;		
-				
 				}				
                             }
 				
