@@ -43,6 +43,23 @@ typedef u_int16_t u16;
 #define PPPGOODFCS16 0xf0b8 /* Good final FCS value */
 #define ASSERT(x) assert(x)
 
+typedef struct {
+    char Inverter[20];
+    char BTAddress[20];
+    char Password[20];
+    char Config[80];
+    char File[80];
+    float latitude_f;
+    float longitude_f;
+    char MySqlHost[20];
+    char MySqlDatabase[20];
+    char MySqlUser[80];
+    char MySqlPwd[80];
+    char PVOutputURL[80];
+    char PVOutputKey[80];
+    char PVOutputSid[20];
+} ConfType;
+
 char *accepted_strings[] = {
 "$END",
 "$ADDR",
@@ -174,8 +191,10 @@ fix_length_send(unsigned char *cp, int *len)
     if(( cp[1] != (*len)+1 ))
     {
       delta = (*len)+1 - cp[1];
-      printf( "sum=%x", cp[1]+cp[3] );
-      printf( "  length change from %x to %x \n", cp[1],(*len)+1 );
+      if( verbose == 1 ) {
+          printf( "sum=%x", cp[1]+cp[3] );
+          printf( "  length change from %x to %x \n", cp[1],(*len)+1 );
+      }
       cp[1] =(*len)+1;
       switch( cp[1] ) {
         case 0x40: cp[3]=0x3e; break;
@@ -432,14 +451,14 @@ char * sunset( float latitude, float longitude )
    return returntime;
 }
 
-int todays_almanac( char * server, char * user, char * password, char * database )
+int todays_almanac( ConfType *conf )
 /*  Check if sunset and sunrise have been set today */
 {
     int	        found=0;
     MYSQL_ROW 	row;
     char 	SQLQUERY[200];
 
-    OpenMySqlDatabase( server, user, password, database);
+    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT sunrise FROM Almanac WHERE date=DATE_FORMAT( NOW(), \"%%Y%%m%%d\" ) " );
     if (verbose == 1) printf("%s\n",SQLQUERY);
@@ -452,12 +471,12 @@ int todays_almanac( char * server, char * user, char * password, char * database
     return found;
 }
 
-void update_almanac( char * server, char * user, char * password, char * database, char * sunrise, char * sunset )
+void update_almanac( ConfType *conf, char * sunrise, char * sunset )
 {
     MYSQL_ROW 	row;
     char 	SQLQUERY[200];
 
-    OpenMySqlDatabase( server, user, password, database);
+    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"INSERT INTO Almanac SET sunrise=CONCAT(DATE_FORMAT( NOW(), \"%%Y-%%m-%%d \"),\"%s\"), sunset=CONCAT(DATE_FORMAT( NOW(), \"%%Y-%%m-%%d \"),\"%s\" ), date=NOW() ", sunrise, sunset );
     if (verbose == 1) printf("%s\n",SQLQUERY);
@@ -465,14 +484,14 @@ void update_almanac( char * server, char * user, char * password, char * databas
     mysql_close(conn);
 }
 
-int is_light( char * server, char * user, char * password, char * database )
+int is_light( ConfType * conf )
 /*  Check if all data done and past sunset or before sunrise */
 {
     int	        light=1;
     MYSQL_ROW 	row;
     char 	SQLQUERY[200];
 
-    OpenMySqlDatabase( server, user, password, database);
+    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT if(sunrise < NOW(),1,0) FROM Almanac WHERE date= DATE_FORMAT( NOW(), \"%%Y-%%m-%%d\" ) " );
     if (verbose == 1) printf("%s\n",SQLQUERY);
@@ -495,38 +514,131 @@ int is_light( char * server, char * user, char * password, char * database )
     return light;
 }
 
+//Set a value depending on inverter
+int  SetInverterType( ConfType *conf, char *InverterCode )  
+{
+    if( strcmp(conf->Inverter, "3000TL") == 0 ) {
+        InverterCode[0] = 0x12;
+        InverterCode[1] = 0x1a;
+        InverterCode[2] = 0xd9;
+        InverterCode[3] = 0x38;
+    }
+    if( strcmp(conf->Inverter, "5000TL") == 0 ) {
+        InverterCode[0] = 0x3f;
+        InverterCode[1] = 0x10;
+        InverterCode[2] = 0xfb;
+        InverterCode[3] = 0x39;
+    }
+}
+
+// Set switches to save lots of strcmps
+int  SetSwitches( ConfType *conf, int *location, int *mysql, int *post, int *file )  
+{
+    //Check if all location variables are set
+    if(( conf->latitude_f <= 180 )&&( conf->longitude_f <= 180 ))
+        (*location)=1;
+    else
+        (*location)=0;
+    //Check if all Mysql variables are set
+    if(( strlen(conf->MySqlUser) > 0 )
+	 &&( strlen(conf->MySqlPwd) > 0 )
+	 &&( strlen(conf->MySqlHost) > 0 )
+	 &&( strlen(conf->MySqlDatabase) > 0 ))
+        (*mysql)=1;
+    else
+        (*mysql)=0;
+    //Check if all File variables are set
+    if( strlen(conf->File) > 0 )
+        (*file)=1;
+    else
+        (*file)=0;
+    //Check if all PVOutput variables are set
+    if(( strlen(conf->PVOutputURL) > 0 )
+	 &&( strlen(conf->PVOutputKey) > 0 )
+	 &&( strlen(conf->PVOutputSid) > 0 ))
+        (*post)=1;
+    else
+        (*post)=0;
+}
+
+/* read Config from file */
+int GetConfig( ConfType *conf )
+{
+    FILE 	*fp;
+    char	line[400];
+    char	variable[400];
+    char	value[400];
+
+    if (strlen(conf->Config) > 0 )
+        fp=fopen(conf->Config,"r");
+    else
+        fp=fopen("./smatool.conf","r");
+    while (!feof(fp)){	
+	if (fgets(line,400,fp) != NULL){				//read line from smatool.conf
+            if( line[0] != '#' ) 
+            {
+                strcpy( value, "" ); //Null out value
+                sscanf( line, "%s %s", variable, value );
+                if( verbose == 1 ) printf( "variable=%s value=%s\n", variable, value );
+                if( strcmp( variable, "Inverter" ) == 0 )
+                   strcpy( conf->Inverter, value );  
+                if( strcmp( variable, "BTAddress" ) == 0 )
+                   strcpy( conf->BTAddress, value );  
+                if( strcmp( variable, "Password" ) == 0 )
+                   strcpy( conf->Password, value );  
+                if( strcmp( variable, "File" ) == 0 )
+                   strcpy( conf->File, value );  
+                if( strcmp( variable, "Latitude" ) == 0 )
+                   conf->latitude_f = atof(value) ;  
+                if( strcmp( variable, "Longitude" ) == 0 )
+                   conf->longitude_f = atof(value) ;  
+                if( strcmp( variable, "MySqlHost" ) == 0 )
+                   strcpy( conf->MySqlHost, value );  
+                if( strcmp( variable, "MySqlDatabase" ) == 0 )
+                   strcpy( conf->MySqlDatabase, value );  
+                if( strcmp( variable, "MySqlUser" ) == 0 )
+                   strcpy( conf->MySqlUser, value );  
+                if( strcmp( variable, "MySqlPwd" ) == 0 )
+                   strcpy( conf->MySqlPwd, value );  
+                if( strcmp( variable, "PVOutputURL" ) == 0 )
+                   strcpy( conf->PVOutputURL, value );  
+                if( strcmp( variable, "PVOutputKey" ) == 0 )
+                   strcpy( conf->PVOutputKey, value );  
+                if( strcmp( variable, "PVOutputSid" ) == 0 )
+                   strcpy( conf->PVOutputSid, value );  
+            }
+        }
+    }
+    fclose( fp );
+}
+
 int main(int argc, char **argv)
 {
 	FILE *fp;
+        ConfType conf;
 	struct sockaddr_rc addr = { 0 };
 	unsigned char received[1024];
 	unsigned char datarecord[1024];
         int archdatalen=0;
         int failedbluetooth=0;
 	int s,i,j,status,mysql=0,post=0,file=0,from=0,to=0;
-        int lat=0,lon=0,sid=0,key=0,pass=0;
+        int location=0;
 	int ret,found,crc_at_end,last, finished=0;
         int togo=0;
         int  initstarted=0,setupstarted=0,rangedatastarted=0;
         long returnpos;
         int returnline;
-	char dest[18];
-	char url[100];
+        char compurl[200];
 	char datefrom[100];
 	char dateto[100];
-        float latitude_f, longitude_f;
-	char pvoutputkey[100];
-	char pvoutputsid[100];
-	char inverter_pass[13];
         int  pass_i;
 	char config[100];
-	char compurl[200];
 	char line[400];
 	char address[6] = { 0 };
 	char address2[6] = { 0 };
 	char timestr[25] = { 0 };
 	char serial[4] = { 0 };
-	char unknown[4] = { 0x12,0x1a,0xd9,0x38 };
+	char unknown[4] = { 0 };
 	char *lineread;
 	time_t curtime;
 	time_t reporttime;
@@ -558,125 +670,124 @@ int main(int argc, char **argv)
       float  current_value;
    } *archdatalist;
 
-   char *server = "localhost";
-   char user[100];
-   char password[100];
-   char *database = "smatool";
    char sunrise_time[6],sunset_time[6];
    
    CURL *curl;
    CURLcode result;
 
    memset(received,0,1024);
-   memset(inverter_pass,0,13);
    /* get the report time - used in various places */
    reporttime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
    //reporttime = 1292823628;
    
-     for (i=1;i<argc;i++)			//Read through passed arguments
-      {
-				if (strcmp(argv[i],"-address")==0){
-                  i++;
-                  if (i<argc){
-							strcpy(dest,argv[i]);
-                 }
-				}
-				if (strcmp(argv[i],"-u")==0){
-                  i++;
-                  if (i<argc){
-							strcpy(user,argv[i]);
-                 }
+    for (i=1;i<argc;i++)			//Read through passed arguments
+    {
+        if (strcmp(argv[i],"-address")==0){
+            i++;
+            if (i<argc){
+	        strcpy(conf.BTAddress,argv[i]);
             }
-				if (strcmp(argv[i],"-p")==0){
-                  i++;
-                  if (i<argc){
-							strcpy(password,argv[i]);
-                 }
-				}				
-				if (strcmp(argv[i],"-v")==0) verbose = 1;
-				if (strcmp(argv[i],"-mysql")==0) mysql=1;
-				if (strcmp(argv[i],"-post")==0){
-					i++;
-					if(i<argc){
-						strcpy(url,argv[i]);
-						post = 1;
-					}
-				}
-				if (strcmp(argv[i],"-pass")==0){
-					i++;
-					if(i<argc){
-						strcpy(inverter_pass,argv[i]);
-						pass = 1;
-					}
-				}
-				if (strcmp(argv[i],"-lat")==0){
-					i++;
-					if(i<argc){
-						latitude_f=atof(argv[i]);
-                                                printf( "lat=%f\n", latitude_f );
-						lat = 1;
-					}
-				}
-				if (strcmp(argv[i],"-long")==0){
-					i++;
-					if(i<argc){
-						longitude_f=atof(argv[i]);
-                                                printf( "long=%f\n", longitude_f );
-						lon = 1;
-					}
-				}
-				if (strcmp(argv[i],"-sid")==0){
-					i++;
-					if(i<argc){
-						strcpy(pvoutputsid,argv[i]);
-						sid = 1;
-					}
-				}
-				if (strcmp(argv[i],"-key")==0){
-					i++;
-					if(i<argc){
-						strcpy(pvoutputkey,argv[i]);
-						key = 1;
-					}
-				}
-				if (strcmp(argv[i],"-file")==0){
-					i++;
-					if(i<argc){
-						strcpy(config,argv[i]);
-						file = 1;
-					}
-				}
-				if (strcmp(argv[i],"-from")==0){
-					i++;
-					if(i<argc){
-						strcpy(datefrom,argv[i]);
-						from = 1;
-					}
-				}
-				if (strcmp(argv[i],"-to")==0){
-					i++;
-					if(i<argc){
-						strcpy(dateto,argv[i]);
-						to  = 1;
-					}
-				}
-		}
-        if((lon==1)&&(lat==1)&&(mysql==1)) {
-          if( ! todays_almanac( server, user, password, database ) ) {
-             sprintf( sunrise_time, "%s", sunrise(latitude_f,longitude_f ));
-             sprintf( sunset_time, "%s", sunset(latitude_f, longitude_f ));
-             printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
-             update_almanac(  server, user, password, database, sunrise_time, sunset_time );
-          }
+	}
+	if (strcmp(argv[i],"-u")==0){
+            i++;
+            if (i<argc){
+		strcpy(conf.MySqlUser,argv[i]);
+            }
         }
-        if((lon==0)||(lat==0)||(mysql==0)||is_light(  server, user, password, database ))
+	if (strcmp(argv[i],"-p")==0){
+            i++;
+            if (i<argc){
+		strcpy(conf.MySqlPwd,argv[i]);
+            }
+	}				
+	if (strcmp(argv[i],"-v")==0) verbose = 1;
+	if (strcmp(argv[i],"-mysql")==0) mysql=1;
+	if (strcmp(argv[i],"-post")==0){
+	    i++;
+	    if(i<argc){
+		strcpy(conf.PVOutputURL,argv[i]);
+	    }
+	}
+	if (strcmp(argv[i],"-pass")==0){
+	    i++;
+	    if(i<argc){
+	        strcpy(conf.Password,argv[i]);
+	    }
+	}
+	if (strcmp(argv[i],"-lat")==0){
+	    i++;
+	    if(i<argc){
+		conf.latitude_f=atof(argv[i]);
+	    }
+	}
+	if (strcmp(argv[i],"-long")==0){
+	    i++;
+	    if(i<argc){
+		conf.longitude_f=atof(argv[i]);
+	    }
+	}
+	if (strcmp(argv[i],"-sid")==0){
+	    i++;
+	    if(i<argc){
+		strcpy(conf.PVOutputSid,argv[i]);
+	    }
+	}
+	if (strcmp(argv[i],"-key")==0){
+	    i++;
+	    if(i<argc){
+		strcpy(conf.PVOutputKey,argv[i]);
+	    }
+	}
+	if (strcmp(argv[i],"-file")==0){
+	    i++;
+	    if(i<argc){
+		strcpy(conf.File,argv[i]);
+	    }
+	}
+	if (strcmp(argv[i],"-conf")==0){
+	    i++;
+	    if(i<argc){
+		strncpy(conf.Config,argv[i], sizeof(conf.Config));
+	    }
+	}
+	if (strcmp(argv[i],"-from")==0){
+	    i++;
+	    if(i<argc){
+		strcpy(datefrom,argv[i]);
+                from = 1;
+	    }
+	}
+	if (strcmp(argv[i],"-to")==0){
+	    i++;
+	    if(i<argc){
+		strcpy(dateto,argv[i]);
+		to  = 1;
+	    }
+	}
+    }
+    // read Config file
+    GetConfig( &conf );
+    // set switches used through the program
+    SetSwitches( &conf, &location, &mysql, &post, &file );  
+    // Set value for inverter type
+    SetInverterType( &conf, unknown );
+    // Location based information to avoid quering Inverter in the dark
+    if((location==1)&&(mysql==1)) {
+       if( ! todays_almanac( &conf ) ) {
+           sprintf( sunrise_time, "%s", sunrise(conf.latitude_f,conf.longitude_f ));
+           sprintf( sunset_time, "%s", sunset(conf.latitude_f, conf.longitude_f ));
+           printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
+           update_almanac(  &conf, sunrise_time, sunset_time );
+        }
+    }
+    if((location=0)||(mysql==0)||is_light( &conf ))
         {
 
 
-	if (verbose ==1) printf("Address %s\n",dest);
+	if (verbose ==1) printf("Address %s\n",conf.BTAddress);
 
         if (file ==1)
-	  fp=fopen(config,"r");
+	  fp=fopen(conf.File,"r");
         else
 	  fp=fopen("/etc/sma.in","r");
 	// allocate a socket
@@ -685,13 +796,13 @@ int main(int argc, char **argv)
    // set the connection parameters (who to connect to)
    addr.rc_family = AF_BLUETOOTH;
    addr.rc_channel = (uint8_t) 1;
-   str2ba( dest, &addr.rc_bdaddr );
+   str2ba( conf.BTAddress, &addr.rc_bdaddr );
 
    // connect to server
    for( i=1; i<5; i++ ){
       status = connect(s, (struct sockaddr *)&addr, sizeof(addr));
 	if (status <0){
-		printf("Error connecting to %s\n",dest);
+		printf("Error connecting to %s\n",conf.BTAddress);
 	}
         else
            break;
@@ -702,7 +813,7 @@ int main(int argc, char **argv)
    }
 
 	// convert address
-	address[5] = conv(strtok(dest,":"));
+	address[5] = conv(strtok(conf.BTAddress,":"));
 	address[4] = conv(strtok(NULL,":"));
 	address[3] = conv(strtok(NULL,":"));
 	address[2] = conv(strtok(NULL,":"));
@@ -998,14 +1109,12 @@ while (!feof(fp)){
 				break;
 				
 				case 19: // $PASSWORD
-                                if( pass==0)
-                                    strcpy(inverter_pass,"0000");
                               
 				for(i=0;i<12;i++){
-				    if( inverter_pass[i] == '\0' )
+				    if( conf.Password[i] == '\0' )
                                   	fl[cc] = 0x88;
                                     else {
-                                        pass_i = inverter_pass[i];
+                                        pass_i = conf.Password[i];
                                         fl[cc] = (( pass_i+0x88 )%0xff);
                                     }
                                     cc++;
@@ -1265,7 +1374,7 @@ while (!feof(fp)){
 
 if (mysql ==1){
 	/* Connect to database */
-    OpenMySqlDatabase( server, user, password, database);
+    OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
     for( i=1; i<archdatalen; i++ ) //Start at 1 as the first record is a dummy
     {
 	sprintf(SQLQUERY,"INSERT INTO DayData ( DateTime, CurrentPower, EtotalToday ) VALUES ( FROM_UNIXTIME(%ld), %0.f, %.3f ) ON DUPLICATE KEY UPDATE DateTime=Datetime, CurrentPower=VALUES(CurrentPower), EtotalToday=VALUES(EtotalToday)",(archdatalist+i)->date, (archdatalist+i)->current_value, (archdatalist+i)->accum_value );
@@ -1283,13 +1392,13 @@ hour = loctime->tm_hour;
 minute = loctime->tm_min; 
 datapoint = (int)(((hour * 60) + minute)) / 5; 
 
-if ((post ==1)&&(sid==1)&&(key==1)){
+if (post ==1){
     char *stopstring;
 
     float dtotal, starttotal;
     
     /* Connect to database */
-    OpenMySqlDatabase( server, user, password, database);
+    OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT EtotalToday FROM DayData WHERE DateTime=DATE_FORMAT( NOW(), \"%%Y%%m%%d000000\" ) " );
     if (verbose == 1) printf("%s\n",SQLQUERY);
@@ -1310,7 +1419,7 @@ if ((post ==1)&&(sid==1)&&(key==1)){
               hour = loctime->tm_hour;
               minute = loctime->tm_min; 
               second = loctime->tm_sec; 
-	      ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",url,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,pvoutputkey,pvoutputsid);
+	      ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",conf.PVOutputURL,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,conf.PVOutputKey,conf.PVOutputSid);
               sprintf(SQLQUERY,"SELECT PVOutput FROM DayData WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  and PVOutput IS NOT NULL", year, month, day, hour, minute, second );
               if (verbose == 1) printf("%s\n",SQLQUERY);
               DoQuery(SQLQUERY);
