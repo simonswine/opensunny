@@ -197,6 +197,8 @@ fix_length_send(unsigned char *cp, int *len)
       }
       cp[1] =(*len)+1;
       switch( cp[1] ) {
+        case 0x3a: cp[3]=0x44; break;
+        case 0x3e: cp[3]=0x40; break;
         case 0x40: cp[3]=0x3e; break;
         case 0x41: cp[3]=0x3f; break;
         case 0x42: cp[3]=0x3c; break;
@@ -204,6 +206,7 @@ fix_length_send(unsigned char *cp, int *len)
         case 0x54: cp[3]=0x2a; break;
         case 0x55: cp[3]=0x2b; break;
         case 0x5c: cp[3]=0x22; break;
+        case 0x5d: cp[3]=0x23; break;
         case 0x5e: cp[3]=0x20; break;
         case 0x5f: cp[3]=0x21; break;
         case 0x60: cp[3]=0x1e; break;
