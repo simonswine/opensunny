@@ -85,7 +85,7 @@ char *accepted_strings[] = {
 "$UNKNOWN"
 };
 
-int cc,verbose = 0;
+int cc,debug = 0,verbose=0;
 unsigned char fl[1024] = { 0 };
 
 
@@ -191,7 +191,7 @@ fix_length_send(unsigned char *cp, int *len)
     if(( cp[1] != (*len)+1 ))
     {
       delta = (*len)+1 - cp[1];
-      if( verbose == 1 ) {
+      if( debug == 1 ) {
           printf( "sum=%x", cp[1]+cp[3] );
           printf( "  length change from %x to %x \n", cp[1],(*len)+1 );
       }
@@ -228,9 +228,9 @@ fix_length_received(unsigned char *received, int *len)
     if( received[1] != (*len) )
     {
       sum = received[1]+received[3];
-      if (verbose == 1) printf( "sum=%x", sum );
+      if (debug == 1) printf( "sum=%x", sum );
       delta = (*len) - received[1];
-      if (verbose == 1) printf( "length change from %x to %x\n", received[1], (*len) );
+      if (debug == 1) printf( "length change from %x to %x\n", received[1], (*len) );
       if(( received[3] != 0x13 )&&( received[3] != 0x14 )) { 
         received[1] = (*len);
         switch( received[1] ) {
@@ -254,7 +254,7 @@ tryfcs16(unsigned char *cp, int len)
 
     memcpy( stripped, cp, len );
     /* add on output */
-    if (verbose ==2){
+    if (debug ==1){
  	printf("String to calculate FCS\n");	 
         	for (i=0;i<len;i++) printf("%02x ",cp[i]);
 	 	printf("\n\n");
@@ -265,7 +265,7 @@ tryfcs16(unsigned char *cp, int len)
     fl[cc] = (trialfcs & 0x00ff);    /* least significant byte first */
     fl[cc+1] = ((trialfcs >> 8) & 0x00ff);
     cc+=2;
-    if (verbose == 2 ){ 
+    if (debug == 2 ){ 
 	printf("FCS = %x%x %x\n",(trialfcs & 0x00ff),((trialfcs >> 8) & 0x00ff), trialfcs); 
     }
 }
@@ -333,12 +333,13 @@ char *  sunrise( float latitude, float longitude )
    //adapted from http://williams.best.vwh.net/sunrise_sunset_algorithm.htm
    time_t curtime;
    struct tm *loctime;
+   struct tm *utctime;
    int day,month,year,hour,minute,second,datapoint;
    char *returntime;
 
    double lnghour,t,M,L,T,RA,Lquadrant,RAquadrant,sinDec,cosDec;
    double cosH, H, UT, localT,lngHour;
-   float localOffset=11.0,zenith=91;
+   float localOffset,zenith=91;
    double pi=M_PI;
 
    returntime = (char *)malloc(6*sizeof(char));
@@ -349,7 +350,17 @@ char *  sunrise( float latitude, float longitude )
    year = loctime->tm_year + 1900;
    hour = loctime->tm_hour;
    minute = loctime->tm_min; 
+   utctime = gmtime(&curtime);
+   
 
+   if( debug == 1 ) printf( "utc=%04d-%02d-%02d %02d:%02d local=%04d-%02d-%02d %02d:%02d diff %d hours\n", utctime->tm_year+1900, utctime->tm_mon+1,utctime->tm_mday,utctime->tm_hour,utctime->tm_min, year, month, day, hour, minute, hour-utctime->tm_hour );
+   localOffset=(hour-utctime->tm_hour)+(minute-utctime->tm_min)/60;
+   if( debug == 1 ) printf( "localOffset=%f\n", localOffset );
+   if(( year > utctime->tm_year+1900 )||( month > utctime->tm_mon+1 )||( day > utctime->tm_mday ))
+      localOffset+=24;
+   if(( year < utctime->tm_year+1900 )||( month < utctime->tm_mon+1 )||( day < utctime->tm_mday ))
+      localOffset-=24;
+   if( debug == 1 ) printf( "localOffset=%f\n", localOffset );
    lngHour = longitude / 15;
    t = loctime->tm_yday + ((6 - lngHour) / 24);
    //Calculate the Sun's mean anomaly
@@ -373,9 +384,11 @@ char *  sunrise( float latitude, float longitude )
    //calculate the Sun's local hour angle
    cosH = (cos((pi/180)*zenith) - (sinDec * sin((pi/180)*latitude))) / (cosDec * cos((pi/180)*latitude));
 	
-   if (cosH >  1); 
+   if (cosH >  1) 
+      printf( "Sun never rises here!\n" );
 	  //the sun never rises on this location (on the specified date)
-   if (cosH < -1);
+   if (cosH < -1)
+      printf( "Sun never sets here!\n" );
 	  //the sun never sets on this location (on the specified date)
    //finish calculating H and convert into hours
    H = 360 -(180/pi)*acos(cosH);
@@ -384,8 +397,17 @@ char *  sunrise( float latitude, float longitude )
    T = H + RA - (0.06571 * t) - 6.622;
    //adjust back to UTC
    UT = T - lngHour;
+   if( UT < 0 ) UT=UT+24;
+   if( UT > 24 ) UT=UT-24;
+   loctime->tm_mday;
+   month = loctime->tm_mon +1;
+   year = loctime->tm_year + 1900;
+   hour = loctime->tm_hour;
+   minute = loctime->tm_min; 
    //convert UT value to local time zone of latitude/longitude
    localT = UT + localOffset;
+   if( localT < 0 ) localT=localT+24;
+   if( localT > 24 ) localT=localT-24;
    sprintf( returntime, "%02.0f:%02.0f",floor(localT),(localT-floor(localT))*60 ); 
    return returntime;
 }
@@ -395,13 +417,14 @@ char * sunset( float latitude, float longitude )
    //adapted from http://williams.best.vwh.net/sunrise_sunset_algorithm.htm
    time_t curtime;
    struct tm *loctime;
+   struct tm *utctime;
    int day,month,year,hour,minute,second,datapoint;
    char *returntime;
 
    returntime = (char *)malloc(6*sizeof(char));
    double lnghour,t,M,L,T,RA,Lquadrant,RAquadrant,sinDec,cosDec;
    double cosH, H, UT, localT,lngHour;
-   float localOffset=11.0,zenith=91;
+   float localOffset,zenith=91;
    double pi=M_PI;
 
    curtime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
@@ -411,6 +434,14 @@ char * sunset( float latitude, float longitude )
    year = loctime->tm_year + 1900;
    hour = loctime->tm_hour;
    minute = loctime->tm_min; 
+   utctime = gmtime(&curtime);
+   
+
+   localOffset=(hour-utctime->tm_hour)+(minute-utctime->tm_min)/60;
+   if(( year > utctime->tm_year+1900 )||( month > utctime->tm_mon+1 )||( day > utctime->tm_mday ))
+      localOffset+=24;
+   if(( year < utctime->tm_year+1900 )||( month < utctime->tm_mon+1 )||( day < utctime->tm_mday ))
+      localOffset-=24;
 
    lngHour = longitude / 15;
    t = loctime->tm_yday + ((18 - lngHour) / 24);
@@ -450,6 +481,8 @@ char * sunset( float latitude, float longitude )
    if( UT < 0 ) UT=UT+24;
    //convert UT value to local time zone of latitude/longitude
    localT = UT + localOffset;
+   if( localT < 0 ) localT=localT+24;
+   if( localT > 24 ) localT=localT-24;
    sprintf( returntime, "%02.0f:%02.0f",floor(localT),(localT-floor(localT))*60 ); 
    return returntime;
 }
@@ -464,7 +497,7 @@ int todays_almanac( ConfType *conf )
     OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT sunrise FROM Almanac WHERE date=DATE_FORMAT( NOW(), \"%%Y%%m%%d\" ) " );
-    if (verbose == 1) printf("%s\n",SQLQUERY);
+    if (debug == 1) printf("%s\n",SQLQUERY);
     DoQuery(SQLQUERY);
     if (row = mysql_fetch_row(res))  //if there is a result, update the row
     {
@@ -482,7 +515,7 @@ void update_almanac( ConfType *conf, char * sunrise, char * sunset )
     OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"INSERT INTO Almanac SET sunrise=CONCAT(DATE_FORMAT( NOW(), \"%%Y-%%m-%%d \"),\"%s\"), sunset=CONCAT(DATE_FORMAT( NOW(), \"%%Y-%%m-%%d \"),\"%s\" ), date=NOW() ", sunrise, sunset );
-    if (verbose == 1) printf("%s\n",SQLQUERY);
+    if (debug == 1) printf("%s\n",SQLQUERY);
     DoQuery(SQLQUERY);
     mysql_close(conn);
 }
@@ -497,7 +530,7 @@ int is_light( ConfType * conf )
     OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT if(sunrise < NOW(),1,0) FROM Almanac WHERE date= DATE_FORMAT( NOW(), \"%%Y-%%m-%%d\" ) " );
-    if (verbose == 1) printf("%s\n",SQLQUERY);
+    if (debug == 1) printf("%s\n",SQLQUERY);
     DoQuery(SQLQUERY);
     if (row = mysql_fetch_row(res))  //if there is a result, update the row
     {
@@ -505,7 +538,7 @@ int is_light( ConfType * conf )
     }
     if( light ) {
        sprintf(SQLQUERY,"SELECT if( dd.datetime > al.sunset,1,0) FROM DayData as dd left join Almanac as al on al.date=DATE(dd.datetime) and al.date=DATE(NOW()) WHERE 1 ORDER BY dd.datetime DESC LIMIT 1" );
-       if (verbose == 1) printf("%s\n",SQLQUERY);
+       if (debug == 1) printf("%s\n",SQLQUERY);
        DoQuery(SQLQUERY);
        if (row = mysql_fetch_row(res))  //if there is a result, update the row
        {
@@ -582,7 +615,7 @@ int GetConfig( ConfType *conf )
             {
                 strcpy( value, "" ); //Null out value
                 sscanf( line, "%s %s", variable, value );
-                if( verbose == 1 ) printf( "variable=%s value=%s\n", variable, value );
+                if( debug == 1 ) printf( "variable=%s value=%s\n", variable, value );
                 if( strcmp( variable, "Inverter" ) == 0 )
                    strcpy( conf->Inverter, value );  
                 if( strcmp( variable, "BTAddress" ) == 0 )
@@ -704,6 +737,7 @@ int main(int argc, char **argv)
             }
 	}				
 	if (strcmp(argv[i],"-v")==0) verbose = 1;
+	if (strcmp(argv[i],"-debug")==0) debug = 1;
 	if (strcmp(argv[i],"-mysql")==0) mysql=1;
 	if (strcmp(argv[i],"-post")==0){
 	    i++;
@@ -779,7 +813,7 @@ int main(int argc, char **argv)
        if( ! todays_almanac( &conf ) ) {
            sprintf( sunrise_time, "%s", sunrise(conf.latitude_f,conf.longitude_f ));
            sprintf( sunset_time, "%s", sunset(conf.latitude_f, conf.longitude_f ));
-           printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
+           if( verbose==1) printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
            update_almanac(  &conf, sunrise_time, sunset_time );
         }
     }
@@ -829,7 +863,7 @@ while (!feof(fp)){
 		linenum++;
 		lineread = strtok(line," ;");
 		if(!strcmp(lineread,"R")){		//See if line is something we need to receive
-			if (verbose	== 1) printf("[%d] Waiting for string\n",linenum);
+			if (debug	== 1) printf("[%d] Waiting for string\n",linenum);
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -871,12 +905,12 @@ while (!feof(fp)){
 				}
 
 			} while (strcmp(lineread,"$END"));
-			if (verbose == 1){ 
+			if (debug == 1){ 
 				printf("[%d]   waiting for: ");
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
 			   printf("\n\n");
 			}
-			if (verbose == 1) printf("[%d] Waiting for data on rfcomm\n",linenum);
+			if (debug == 1) printf("[%d] Waiting for data on rfcomm\n",linenum);
 			found = 0;
 			do {
                             rr=0;
@@ -896,7 +930,7 @@ while (!feof(fp)){
                                goto start;
                             }
                             else {
-			      if (verbose == 1){ 
+			      if (debug == 1){ 
                                 printf( "  [%d] looking for: ",linenum);
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
                                 printf( "\n" );
@@ -907,19 +941,19 @@ while (!feof(fp)){
                            
 			      if (memcmp(fl,received,cc) == 0){
 				  found = 1;
-				  if (verbose == 1) printf("[%d] Found string we are waiting for\n",linenum); 
+				  if (debug == 1) printf("[%d] Found string we are waiting for\n",linenum); 
 			      } else {
-				  if (verbose == 1) printf("[%d] Did not find string\n",linenum); 
+				  if (debug == 1) printf("[%d] Did not find string\n",linenum); 
 			      }
                             }
 			} while (found == 0);
-			if (verbose == 1){ 
+			if (debug == 1){ 
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
 			   printf("\n\n");
 			}
 		}
 		if(!strcmp(lineread,"S")){		//See if line is something we need to send
-			if (verbose	== 1) printf("[%d] Sending\n",linenum);
+			if (debug	== 1) printf("[%d] Sending\n",linenum);
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -1137,7 +1171,7 @@ while (!feof(fp)){
 				}
 
 			} while (strcmp(lineread,"$END"));
-			if (verbose == 1){ 
+			if (debug == 1){ 
 				printf( "  [%d] sending:\n",linenum);
                                 printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
                                 j=12;
@@ -1155,7 +1189,7 @@ while (!feof(fp)){
 
 
 		if(!strcmp(lineread,"E")){		//See if line is something we need to extract
-			if (verbose	== 1) printf("[%d] Extracting\n",linenum);
+			if (debug	== 1) printf("[%d] Extracting\n",linenum);
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -1208,17 +1242,17 @@ while (!feof(fp)){
 
 				case 7: // extract 2nd address
 				memcpy(address2,received+26,6);
-				if (verbose == 1) printf("address 2 \n");
+				if (debug == 1) printf("address 2 \n");
 				break;
 				
 				case 8: // extract bluetooth channel
 				memcpy(chan,received+22,1);
-				if (verbose == 1) printf("Bluetooth channel = %i\n",chan[0]);
+				if (debug == 1) printf("Bluetooth channel = %i\n",chan[0]);
 				break;
 
 				case 12: // extract time strings $TIMESTRING
 				memcpy(timestr,received+63,24);
-				if (verbose == 1) printf("extracting timestring\n");
+				if (debug == 1) printf("extracting timestring\n");
                                 
 				break;
 
@@ -1381,7 +1415,7 @@ if (mysql ==1){
     for( i=1; i<archdatalen; i++ ) //Start at 1 as the first record is a dummy
     {
 	sprintf(SQLQUERY,"INSERT INTO DayData ( DateTime, CurrentPower, EtotalToday ) VALUES ( FROM_UNIXTIME(%ld), %0.f, %.3f ) ON DUPLICATE KEY UPDATE DateTime=Datetime, CurrentPower=VALUES(CurrentPower), EtotalToday=VALUES(EtotalToday)",(archdatalist+i)->date, (archdatalist+i)->current_value, (archdatalist+i)->accum_value );
-	if (verbose == 1) printf("%s\n",SQLQUERY);
+	if (debug == 1) printf("%s\n",SQLQUERY);
 	DoQuery(SQLQUERY);
     }
     mysql_close(conn);
@@ -1404,7 +1438,7 @@ if (post ==1){
     OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT EtotalToday FROM DayData WHERE DateTime=DATE_FORMAT( NOW(), \"%%Y%%m%%d000000\" ) " );
-    if (verbose == 1) printf("%s\n",SQLQUERY);
+    if (debug == 1) printf("%s\n",SQLQUERY);
     DoQuery(SQLQUERY);
     if (row = mysql_fetch_row(res))  //if there is a result, update the row
     {
@@ -1424,9 +1458,9 @@ if (post ==1){
               second = loctime->tm_sec; 
 	      ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",conf.PVOutputURL,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,conf.PVOutputKey,conf.PVOutputSid);
               sprintf(SQLQUERY,"SELECT PVOutput FROM DayData WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  and PVOutput IS NOT NULL", year, month, day, hour, minute, second );
-              if (verbose == 1) printf("%s\n",SQLQUERY);
+              if (debug == 1) printf("%s\n",SQLQUERY);
               DoQuery(SQLQUERY);
-	      if (verbose == 1) printf("url = %s\n",compurl); 
+	      if (debug == 1) printf("url = %s\n",compurl); 
               if (row = mysql_fetch_row(res))  //if there is a result, already done
               {
 	         if (verbose == 1) printf("Already Updated\n");
@@ -1439,12 +1473,12 @@ if (post ==1){
 		     curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		     curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 		     result = curl_easy_perform(curl);
-	             if (verbose == 1) printf("result = %d\n",result);
+	             if (debug == 1) printf("result = %d\n",result);
 		     curl_easy_cleanup(curl);
                      if( result==0 ) 
                      {
                         sprintf(SQLQUERY,"UPDATE DayData  set PVOutput=NOW() WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  ", year, month, day, hour, minute, second );
-                        if (verbose == 1) printf("%s\n",SQLQUERY);
+                        if (debug == 1) printf("%s\n",SQLQUERY);
                         DoQuery(SQLQUERY);
                      }
                      else
@@ -1488,13 +1522,13 @@ read_bluetooth( int *s, int *rr, unsigned char *received )
 	(*rr) = 0;
         for( i=0; i<sizeof(header); i++ ) {
             received[(*rr)] = header[i];
-	    if (verbose == 1) printf("%02x ", received[(*rr)]);
+	    if (debug == 1) printf("%02x ", received[(*rr)]);
             (*rr)++;
         }
     }
     else
     {
-       printf("Timeout reading bluetooth socket\n");
+       if( verbose==1) printf("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
@@ -1504,14 +1538,14 @@ read_bluetooth( int *s, int *rr, unsigned char *received )
     }
     else
     {
-       printf("Timeout reading bluetooth socket\n");
+       if( verbose==1) printf("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
     }
     if ( bytes_read > 0){
-        if (verbose == 1) printf("\nReceiving\n");
-	if (verbose == 1){ 
+        if (debug == 1) printf("\nReceiving\n");
+	if (debug == 1){ 
            printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
            j=12;
            for( i=0; i<sizeof(header); i++ ) {
@@ -1550,15 +1584,15 @@ read_bluetooth( int *s, int *rr, unsigned char *received )
 	    else { 
                received[(*rr)] = buf[i];
             }
-	    if (verbose == 1) printf("%02x ", received[(*rr)]);
+	    if (debug == 1) printf("%02x ", received[(*rr)]);
 	    (*rr)++;
 	}
         fix_length_received( received, rr );
-	if (verbose == 1) {
+	if (debug == 1) {
 	    printf("\n");
             for( i=0;i<(*rr); i++ ) printf("%02x ", received[(i)]);
         }
-	if (verbose == 1) printf("\n\n");
+	if (debug == 1) printf("\n\n");
     }	
     return 0;
 }
