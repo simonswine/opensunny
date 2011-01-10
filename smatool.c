@@ -650,6 +650,14 @@ int GetConfig( ConfType *conf )
     fclose( fp );
 }
 
+size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) 
+{
+    size_t written;
+
+    written = fwrite(ptr, size, nmemb, stream);
+    return written;
+}
+
 int main(int argc, char **argv)
 {
 	FILE *fp;
@@ -749,6 +757,10 @@ int main(int argc, char **argv)
 		strcpy(conf.PVOutputURL,argv[i]);
 	    }
 	}
+	if (strcmp(argv[i],"-repost")==0){
+	    i++;
+            repost=1;
+	}
 	if (strcmp(argv[i],"-pass")==0){
 	    i++;
 	    if(i<argc){
@@ -821,8 +833,8 @@ int main(int argc, char **argv)
            update_almanac(  &conf, sunrise_time, sunset_time );
         }
     }
-    if((location=0)||(mysql==0)||is_light( &conf ))
-        {
+    if((( from==1 )&&(to==1))&&((location=0)||(mysql==0)||is_light( &conf )))
+    {
 
 
 	if (verbose ==1) printf("Address %s\n",conf.BTAddress);
@@ -853,15 +865,15 @@ int main(int argc, char **argv)
 	return( -1 );
    }
 
-	// convert address
-	address[5] = conv(strtok(conf.BTAddress,":"));
-	address[4] = conv(strtok(NULL,":"));
-	address[3] = conv(strtok(NULL,":"));
-	address[2] = conv(strtok(NULL,":"));
-	address[1] = conv(strtok(NULL,":"));
-	address[0] = conv(strtok(NULL,":"));
+   // convert address
+   address[5] = conv(strtok(conf.BTAddress,":"));
+   address[4] = conv(strtok(NULL,":"));
+   address[3] = conv(strtok(NULL,":"));
+   address[2] = conv(strtok(NULL,":"));
+   address[1] = conv(strtok(NULL,":"));
+   address[0] = conv(strtok(NULL,":"));
 	
-while (!feof(fp)){	
+   while (!feof(fp)){	
         start:
 	if (fgets(line,400,fp) != NULL){				//read line from sma.in
 		linenum++;
@@ -1437,158 +1449,175 @@ while (!feof(fp)){
 		   returnline = linenum;
                 }
 	}
-}
+    }
 
-if ((mysql ==1)&&(error==0)){
+    if ((mysql ==1)&&(error==0)){
 	/* Connect to database */
-    OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
-    for( i=1; i<archdatalen; i++ ) //Start at 1 as the first record is a dummy
-    {
-	sprintf(SQLQUERY,"INSERT INTO DayData ( DateTime, CurrentPower, EtotalToday ) VALUES ( FROM_UNIXTIME(%ld), %0.f, %.3f ) ON DUPLICATE KEY UPDATE DateTime=Datetime, CurrentPower=VALUES(CurrentPower), EtotalToday=VALUES(EtotalToday)",(archdatalist+i)->date, (archdatalist+i)->current_value, (archdatalist+i)->accum_value );
-	if (debug == 1) printf("%s\n",SQLQUERY);
-	DoQuery(SQLQUERY);
-    }
-    mysql_close(conn);
-}
-
-loctime = localtime(&curtime);
-day = loctime->tm_mday;
-month = loctime->tm_mon +1;
-year = loctime->tm_year + 1900;
-hour = loctime->tm_hour;
-minute = loctime->tm_min; 
-datapoint = (int)(((hour * 60) + minute)) / 5; 
-
-if ((post ==1)&&(error==0)){
-    char *stopstring;
-
-    float dtotal, starttotal;
-    
-    /* Connect to database */
-    OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
-    //Get Start of day value
-    sprintf(SQLQUERY,"SELECT EtotalToday FROM DayData WHERE DateTime=DATE_FORMAT( NOW(), \"%%Y%%m%%d000000\" ) " );
-    if (debug == 1) printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
-    if (row = mysql_fetch_row(res))  //if there is a result, update the row
-    {
-        starttotal = atof( (char *)row[0] );
-
-        for( i=1; i<archdatalen; i++ ) { //Start at 1 as the first record is a dummy
-           if((archdatalist+i)->current_value > 0 )
-           {
-	      dtotal = (archdatalist+i)->accum_value*1000 - (starttotal*1000);
-              idate = (archdatalist+i)->date;
-	      loctime = localtime(&(archdatalist+i)->date);
-              day = loctime->tm_mday;
-              month = loctime->tm_mon +1;
-              year = loctime->tm_year + 1900;
-              hour = loctime->tm_hour;
-              minute = loctime->tm_min; 
-              second = loctime->tm_sec; 
-	      ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",conf.PVOutputURL,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,conf.PVOutputKey,conf.PVOutputSid);
-              sprintf(SQLQUERY,"SELECT PVOutput FROM DayData WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  and PVOutput IS NOT NULL", year, month, day, hour, minute, second );
-              if (debug == 1) printf("%s\n",SQLQUERY);
-              DoQuery(SQLQUERY);
-	      if (debug == 1) printf("url = %s\n",compurl); 
-              if (row = mysql_fetch_row(res))  //if there is a result, already done
-              {
-	         if (verbose == 1) printf("Already Updated\n");
-              }
-              else
-              {
-                
-	        curl = curl_easy_init();
-	        if (curl){
-		     curl_easy_setopt(curl, CURLOPT_URL, compurl);
-		     curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
-		     result = curl_easy_perform(curl);
-	             if (debug == 1) printf("result = %d\n",result);
-		     curl_easy_cleanup(curl);
-                     if( result==0 ) 
-                     {
-                        sprintf(SQLQUERY,"UPDATE DayData  set PVOutput=NOW() WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  ", year, month, day, hour, minute, second );
-                        if (debug == 1) printf("%s\n",SQLQUERY);
-                        DoQuery(SQLQUERY);
-                     }
-                     else
-                        break;
-		  
-	        }
-             }
-           }
+        OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
+        for( i=1; i<archdatalen; i++ ) //Start at 1 as the first record is a dummy
+        {
+	    sprintf(SQLQUERY,"INSERT INTO DayData ( DateTime, CurrentPower, EtotalToday ) VALUES ( FROM_UNIXTIME(%ld), %0.f, %.3f ) ON DUPLICATE KEY UPDATE DateTime=Datetime, CurrentPower=VALUES(CurrentPower), EtotalToday=VALUES(EtotalToday)",(archdatalist+i)->date, (archdatalist+i)->current_value, (archdatalist+i)->accum_value );
+	    if (debug == 1) printf("%s\n",SQLQUERY);
+	    DoQuery(SQLQUERY);
         }
+        mysql_close(conn);
     }
-    mysql_close(conn);
+
+    loctime = localtime(&curtime);
+    day = loctime->tm_mday;
+    month = loctime->tm_mon +1;
+    year = loctime->tm_year + 1900;
+    hour = loctime->tm_hour;
+    minute = loctime->tm_min; 
+    datapoint = (int)(((hour * 60) + minute)) / 5; 
+
+    if ((post ==1)&&(error==0)){
+        char *stopstring;
+    
+        float dtotal, starttotal;
+        
+        /* Connect to database */
+        OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
+        //Get Start of day value
+        sprintf(SQLQUERY,"SELECT EtotalToday FROM DayData WHERE DateTime=DATE_FORMAT( NOW(), \"%%Y%%m%%d000000\" ) " );
+        if (debug == 1) printf("%s\n",SQLQUERY);
+        DoQuery(SQLQUERY);
+        if (row = mysql_fetch_row(res))  //if there is a result, update the row
+        {
+            starttotal = atof( (char *)row[0] );
+    
+            for( i=1; i<archdatalen; i++ ) { //Start at 1 as the first record is a dummy
+               if((archdatalist+i)->current_value > 0 )
+               {
+	          dtotal = (archdatalist+i)->accum_value*1000 - (starttotal*1000);
+                  idate = (archdatalist+i)->date;
+	          loctime = localtime(&(archdatalist+i)->date);
+                  day = loctime->tm_mday;
+                  month = loctime->tm_mon +1;
+                  year = loctime->tm_year + 1900;
+                  hour = loctime->tm_hour;
+                  minute = loctime->tm_min; 
+                  second = loctime->tm_sec; 
+	          ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",conf.PVOutputURL,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,conf.PVOutputKey,conf.PVOutputSid);
+                  sprintf(SQLQUERY,"SELECT PVOutput FROM DayData WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  and PVOutput IS NOT NULL", year, month, day, hour, minute, second );
+                  if (debug == 1) printf("%s\n",SQLQUERY);
+                  DoQuery(SQLQUERY);
+	          if (debug == 1) printf("url = %s\n",compurl); 
+                  if (row = mysql_fetch_row(res))  //if there is a result, already done
+                  {
+	             if (verbose == 1) printf("Already Updated\n");
+                  }
+                  else
+                  {
+                    
+	            curl = curl_easy_init();
+	            if (curl){
+		         curl_easy_setopt(curl, CURLOPT_URL, compurl);
+		         curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
+		         result = curl_easy_perform(curl);
+	                 if (debug == 1) printf("result = %d\n",result);
+		         curl_easy_cleanup(curl);
+                         if( result==0 ) 
+                         {
+                            sprintf(SQLQUERY,"UPDATE DayData  set PVOutput=NOW() WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  ", year, month, day, hour, minute, second );
+                            if (debug == 1) printf("%s\n",SQLQUERY);
+                            DoQuery(SQLQUERY);
+                         }
+                         else
+                            break;
+		      
+	            }
+                 }
+               }
+            }
+        }
+        mysql_close(conn);
+    }
+
+  close(s);
+  free(archdatalist);
 }
 
 if ((repost ==1)&&(error==0)){
     char *stopstring;
+    FILE* fp;
+    char buf[1024], buf1[400];
+    int	 update_data;
 
     float dtotal, starttotal;
+    float power;
     
     /* Connect to database */
     OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
     //Get Start of day value
-    sprintf(SQLQUERY,"SELECT Date_Format( EtotalToday FROM DayData WHERE DateTime=DATE_FORMAT( NOW(), \"%%Y%%m%%d000000\" ) " );
+    starttotal = 0;
+    sprintf(SQLQUERY,"SELECT DATE_FORMAT( DateTime, \"%%Y%%m%%d\" ), ETotalToday FROM DayData WHERE DateTime LIKE \"%%-%%-%% 23:55:00\" ORDER BY DateTime ASC" );
     if (debug == 1) printf("%s\n",SQLQUERY);
     DoQuery(SQLQUERY);
-    if (row = mysql_fetch_row(res))  //if there is a result, update the row
+    while (row = mysql_fetch_row(res))  //if there is a result, update the row
     {
-        starttotal = atof( (char *)row[0] );
-
-        for( i=1; i<archdatalen; i++ ) { //Start at 1 as the first record is a dummy
-           if((archdatalist+i)->current_value > 0 )
-           {
-	      dtotal = (archdatalist+i)->accum_value*1000 - (starttotal*1000);
-              idate = (archdatalist+i)->date;
-	      loctime = localtime(&(archdatalist+i)->date);
-              day = loctime->tm_mday;
-              month = loctime->tm_mon +1;
-              year = loctime->tm_year + 1900;
-              hour = loctime->tm_hour;
-              minute = loctime->tm_min; 
-              second = loctime->tm_sec; 
-	      ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",conf.PVOutputURL,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,conf.PVOutputKey,conf.PVOutputSid);
-              sprintf(SQLQUERY,"SELECT PVOutput FROM DayData WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  and PVOutput IS NOT NULL", year, month, day, hour, minute, second );
-              if (debug == 1) printf("%s\n",SQLQUERY);
-              DoQuery(SQLQUERY);
-	      if (debug == 1) printf("url = %s\n",compurl); 
-              if (row = mysql_fetch_row(res))  //if there is a result, already done
-              {
-	         if (verbose == 1) printf("Already Updated\n");
-              }
-              else
-              {
-                
-	        curl = curl_easy_init();
-	        if (curl){
-		     curl_easy_setopt(curl, CURLOPT_URL, compurl);
-		     curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
-		     result = curl_easy_perform(curl);
-	             if (debug == 1) printf("result = %d\n",result);
-		     curl_easy_cleanup(curl);
-                     if( result==0 ) 
-                     {
-                        sprintf(SQLQUERY,"UPDATE DayData  set PVOutput=NOW() WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  ", year, month, day, hour, minute, second );
-                        if (debug == 1) printf("%s\n",SQLQUERY);
-                        DoQuery(SQLQUERY);
-                     }
-                     else
-                        break;
-		  
-	        }
+        fp=fopen( "/tmp/curl_output", "w+" );
+        update_data = 0;
+        dtotal = atof(row[1])*1000 - starttotal;
+        starttotal=atof(row[1])*1000;
+	ret=sprintf(compurl,"http://pvoutput.org/service/r1/getstatistic.jsp?df=%s&dt=%s&key=%s&sid=%s",row[0],row[0],conf.PVOutputKey,conf.PVOutputSid);
+        curl = curl_easy_init();
+        if (curl){
+	     curl_easy_setopt(curl, CURLOPT_URL, compurl);
+	     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+	     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+	     //curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
+	     result = curl_easy_perform(curl);
+             if (debug == 1) printf("result = %d\n",result);
+             rewind( fp );
+             fgets( buf, sizeof( buf ), fp );
+             result = sscanf( buf, "Bad request %s has no outputs between the requested period", buf1 );
+             printf( "return=%d buf1=%s\n", result, buf1 );
+             if( result > 0 )
+             {
+                 update_data=1;
+                 printf( "test\n" );
              }
-           }
+             else
+             {
+                 printf( "buf=%s here\n", buf );
+                 if( sscanf( buf, "%f,%s", &power, buf1 ) > 0 ) {
+                    printf( "Power %f\n", power );
+                    if( power != dtotal )
+                    {
+                       printf( "Power %f Produced=%f\n", power, dtotal );
+                       update_data=1;
+                    }
+                 }
+             }
+	     curl_easy_cleanup(curl);
+             if( update_data == 1 ) {
+                 curl = curl_easy_init();
+                 if (curl){
+	            ret=sprintf(compurl,"http://pvoutput.org/service/r1/addoutput.jsp?d=%s&g=%f&key=%s&sid=%s",row[0],dtotal,conf.PVOutputKey,conf.PVOutputSid);
+                    if (debug == 1) printf("url = %s\n",compurl);
+		    curl_easy_setopt(curl, CURLOPT_URL, compurl);
+		    curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
+		    result = curl_easy_perform(curl);
+	            if (debug == 1) printf("result = %d\n",result);
+		    curl_easy_cleanup(curl);
+                    if( result==0 ) 
+                    {
+                        sprintf(SQLQUERY,"UPDATE DayData set PVOutput=NOW() WHERE DateTime=\"%s235500\"  ", row[0] );
+                        if (debug == 1) printf("%s\n",SQLQUERY);
+                        //DoQuery(SQLQUERY);
+                    }
+                    else
+                        break;
+                 }
+             }
         }
+        fclose(fp);
     }
     mysql_close(conn);
 }
 
-close(s);
-free(archdatalist);
 return 0;
-}
 }
 
 int
