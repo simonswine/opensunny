@@ -82,7 +82,8 @@ char *accepted_strings[] = {
 "$ARCHIVEDATA1",
 "$PASSWORD",
 "$SIGNAL",
-"$UNKNOWN"
+"$UNKNOWN",
+"$INVCODE"
 };
 
 int cc,debug = 0,verbose=0;
@@ -188,11 +189,12 @@ fix_length_send(unsigned char *cp, int *len)
 {
     int	    delta=0;
 
+    if( debug == 1 ) 
+       printf( "sum=%x\n", cp[1]+cp[3] );
     if(( cp[1] != (*len)+1 ))
     {
       delta = (*len)+1 - cp[1];
       if( debug == 1 ) {
-          printf( "sum=%x", cp[1]+cp[3] );
           printf( "  length change from %x to %x \n", cp[1],(*len)+1 );
       }
       cp[1] =(*len)+1;
@@ -657,8 +659,8 @@ int main(int argc, char **argv)
 	unsigned char datarecord[1024];
         int archdatalen=0;
         int failedbluetooth=0;
-	int s,i,j,status,mysql=0,post=0,file=0,from=0,to=0;
-        int location=0;
+	int s,i,j,status,mysql=0,post=0,repost=0,file=0,from=0,to=0;
+        int location=0, error=0;
 	int ret,found,crc_at_end,last, finished=0;
         int togo=0;
         int  initstarted=0,setupstarted=0,rangedatastarted=0;
@@ -675,12 +677,14 @@ int main(int argc, char **argv)
 	char timestr[25] = { 0 };
 	char serial[4] = { 0 };
 	char unknown[4] = { 0 };
+        int  invcode;
 	char *lineread;
 	time_t curtime;
 	time_t reporttime;
 	time_t fromtime;
 	time_t totime;
 	time_t idate;
+	time_t prev_idate;
 	struct tm *loctime;
 	struct tm tm;
 	int day,month,year,hour,minute,second,datapoint;
@@ -1165,6 +1169,11 @@ while (!feof(fp)){
 				}
                                 break;
 
+				case 22: // $INVCODE
+			            fl[cc] = invcode;
+				    cc++;
+                                break;
+
 				default :
 				fl[cc] = conv(lineread);
 				cc++;
@@ -1291,6 +1300,7 @@ while (!feof(fp)){
                                 crc_at_end=0;
                                 j=0;
                                 ptotal=0;
+                                idate=0;
                                 printf( "\n" );
                                 while( finished != 1 ) {
                                     if( i> 500 ) break;
@@ -1300,7 +1310,12 @@ while (!feof(fp)){
                                        datarecord[j]=received[i];
                                        j++;
                                        if( j > 11 ) {
+                                         if( idate > 0 ) prev_idate=idate;
+                                         else prev_idate=0;
 				         idate = (datarecord[3] * 16777216 ) + (datarecord[2] *65536 )+ (datarecord[1] * 256) + datarecord[0];
+                                         if( prev_idate == 0 )
+                                            prev_idate = idate-300;
+
                                          loctime = localtime(&idate);
                                          day = loctime->tm_mday;
                                          month = loctime->tm_mon +1;
@@ -1311,7 +1326,12 @@ while (!feof(fp)){
 				         gtotal = (datarecord[6] * 65536) + (datarecord[5] * 256) + datarecord[4];
                                          if( ptotal == 0 )
                                             ptotal = gtotal;
-	                                 if (verbose == 1) printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts togo=%d", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12, togo);
+	                                 if (verbose == 1) printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts togo=%d i=%d crc=%d", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12, togo, i, crc_at_end);
+                                         if( idate != prev_idate+300 ) {
+                                            printf( "Date Error! prev=%d current=%d\n", prev_idate, idate );
+                                            error=1;
+					    break;
+                                         }
                                          if( archdatalen == 0 )
                                             archdatalist = (struct archdata_type *)malloc( sizeof( struct archdata_type ) );
                                          else
@@ -1349,8 +1369,11 @@ while (!feof(fp)){
                                     
 					switch ( received[3] ) {
                                         
+                                        case 0x11 :
+                                        case 0x12 :
                                         case 0x13 :
                                         case 0x15 :
+                                        case 0x1c :
                                            if( crc_at_end == 1 ) {
                                               i=59;
                                               crc_at_end = 0;
@@ -1359,6 +1382,8 @@ while (!feof(fp)){
                                            }
                                            else
                                              i=18;
+                                           if( received[rr-1] == 0x7e )
+                                              crc_at_end = 1;
                                            break;
                                              
                                         default:
@@ -1386,6 +1411,11 @@ while (!feof(fp)){
                                     printf("bluetooth signal  = %.0f%\n",strength);
                                 }
                                 break;		
+				case 22: // extract time strings $INVCODE
+				invcode=received[22];
+				if (debug == 1) printf("extracting invcode=%02x\n", invcode);
+                                
+				break;
 				}				
                             }
 				
@@ -1409,7 +1439,7 @@ while (!feof(fp)){
 	}
 }
 
-if (mysql ==1){
+if ((mysql ==1)&&(error==0)){
 	/* Connect to database */
     OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
     for( i=1; i<archdatalen; i++ ) //Start at 1 as the first record is a dummy
@@ -1429,7 +1459,7 @@ hour = loctime->tm_hour;
 minute = loctime->tm_min; 
 datapoint = (int)(((hour * 60) + minute)) / 5; 
 
-if (post ==1){
+if ((post ==1)&&(error==0)){
     char *stopstring;
 
     float dtotal, starttotal;
@@ -1438,6 +1468,69 @@ if (post ==1){
     OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT EtotalToday FROM DayData WHERE DateTime=DATE_FORMAT( NOW(), \"%%Y%%m%%d000000\" ) " );
+    if (debug == 1) printf("%s\n",SQLQUERY);
+    DoQuery(SQLQUERY);
+    if (row = mysql_fetch_row(res))  //if there is a result, update the row
+    {
+        starttotal = atof( (char *)row[0] );
+
+        for( i=1; i<archdatalen; i++ ) { //Start at 1 as the first record is a dummy
+           if((archdatalist+i)->current_value > 0 )
+           {
+	      dtotal = (archdatalist+i)->accum_value*1000 - (starttotal*1000);
+              idate = (archdatalist+i)->date;
+	      loctime = localtime(&(archdatalist+i)->date);
+              day = loctime->tm_mday;
+              month = loctime->tm_mon +1;
+              year = loctime->tm_year + 1900;
+              hour = loctime->tm_hour;
+              minute = loctime->tm_min; 
+              second = loctime->tm_sec; 
+	      ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",conf.PVOutputURL,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,conf.PVOutputKey,conf.PVOutputSid);
+              sprintf(SQLQUERY,"SELECT PVOutput FROM DayData WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  and PVOutput IS NOT NULL", year, month, day, hour, minute, second );
+              if (debug == 1) printf("%s\n",SQLQUERY);
+              DoQuery(SQLQUERY);
+	      if (debug == 1) printf("url = %s\n",compurl); 
+              if (row = mysql_fetch_row(res))  //if there is a result, already done
+              {
+	         if (verbose == 1) printf("Already Updated\n");
+              }
+              else
+              {
+                
+	        curl = curl_easy_init();
+	        if (curl){
+		     curl_easy_setopt(curl, CURLOPT_URL, compurl);
+		     curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
+		     result = curl_easy_perform(curl);
+	             if (debug == 1) printf("result = %d\n",result);
+		     curl_easy_cleanup(curl);
+                     if( result==0 ) 
+                     {
+                        sprintf(SQLQUERY,"UPDATE DayData  set PVOutput=NOW() WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  ", year, month, day, hour, minute, second );
+                        if (debug == 1) printf("%s\n",SQLQUERY);
+                        DoQuery(SQLQUERY);
+                     }
+                     else
+                        break;
+		  
+	        }
+             }
+           }
+        }
+    }
+    mysql_close(conn);
+}
+
+if ((repost ==1)&&(error==0)){
+    char *stopstring;
+
+    float dtotal, starttotal;
+    
+    /* Connect to database */
+    OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
+    //Get Start of day value
+    sprintf(SQLQUERY,"SELECT Date_Format( EtotalToday FROM DayData WHERE DateTime=DATE_FORMAT( NOW(), \"%%Y%%m%%d000000\" ) " );
     if (debug == 1) printf("%s\n",SQLQUERY);
     DoQuery(SQLQUERY);
     if (row = mysql_fetch_row(res))  //if there is a result, update the row
