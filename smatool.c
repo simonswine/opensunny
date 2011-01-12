@@ -44,20 +44,21 @@ typedef u_int16_t u16;
 #define ASSERT(x) assert(x)
 
 typedef struct {
-    char Inverter[20];
-    char BTAddress[20];
-    char Password[20];
-    char Config[80];
-    char File[80];
-    float latitude_f;
-    float longitude_f;
-    char MySqlHost[20];
-    char MySqlDatabase[20];
-    char MySqlUser[80];
-    char MySqlPwd[80];
-    char PVOutputURL[80];
-    char PVOutputKey[80];
-    char PVOutputSid[20];
+    char Inverter[20]; 		//--inverter 	-i
+    char BTAddress[20];         //--address  	-a
+    int  bt_timeout;		//--timeout  	-t
+    char Password[20];          //--password 	-p
+    char Config[80];            //--config   	-c
+    char File[80];              //--file     	-f
+    float latitude_f;           //--latitude  	-la
+    float longitude_f;          //--longitude 	-lo
+    char MySqlHost[20];         //--mysqlhost   -h
+    char MySqlDatabase[20];     //--mysqldb     -d
+    char MySqlUser[80];         //--mysqluser   -user
+    char MySqlPwd[80];          //--mysqlpwd    -pwd
+    char PVOutputURL[80];       //--pvouturl    -url
+    char PVOutputKey[80];       //--pvoutkey    -key
+    char PVOutputSid[20];       //--pvoutsid    -sid
 } ConfType;
 
 char *accepted_strings[] = {
@@ -319,6 +320,109 @@ unsigned char conv(char *nn){
 		return res;
 }
 
+int
+read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, int *terminated )
+{
+    int bytes_read,i,j;
+    unsigned char buf[1024]; //read buffer
+    unsigned char header[3]; //read buffer
+    struct timeval tv;
+    fd_set readfds;
+
+    tv.tv_sec = conf->bt_timeout; // set timeout of reading
+    tv.tv_usec = 0;
+    memset(buf,0,1024);
+
+    FD_ZERO(&readfds);
+    FD_SET((*s), &readfds);
+				
+    select((*s)+1, &readfds, NULL, NULL, &tv);
+				
+    (*terminated) = 0; // Tag to tell if string has 7e termination
+    // first read the header to get the record length
+    if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
+        bytes_read = recv((*s), header, sizeof(header), 0); //Get length of string
+	(*rr) = 0;
+        for( i=0; i<sizeof(header); i++ ) {
+            received[(*rr)] = header[i];
+	    if (debug == 1) printf("%02x ", received[(*rr)]);
+            (*rr)++;
+        }
+    }
+    else
+    {
+       if( verbose==1) printf("Timeout reading bluetooth socket\n");
+       (*rr) = 0;
+       memset(received,0,1024);
+       return -1;
+    }
+    if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
+        bytes_read = recv((*s), buf, header[1]-3, 0); //Read the length specified by header
+    }
+    else
+    {
+       if( verbose==1) printf("Timeout reading bluetooth socket\n");
+       (*rr) = 0;
+       memset(received,0,1024);
+       return -1;
+    }
+    if ( bytes_read > 0){
+        if (debug == 1) printf("\nReceiving\n");
+	if (debug == 1){ 
+           printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
+           j=12;
+           for( i=0; i<sizeof(header); i++ ) {
+              if( j%16== 0 )
+                 printf( "\n    %08x: ",j);
+              printf("%02x ",header[i]);
+              j++;
+           }
+	   for (i=0;i<bytes_read;i++) {
+              if( j%16== 0 )
+                 printf( "\n    %08x: ",j);
+              printf("%02x ",buf[i]);
+              j++;
+           }
+           printf(" rr=%d",(bytes_read+(*rr)));
+	   printf("\n\n");
+        }
+        if( buf[ bytes_read-1 ] == 0x7e )
+           (*terminated) = 1;
+        else
+           (*terminated) = 0;
+        for (i=0;i<bytes_read;i++){ //start copy the rec buffer in to received
+            if (buf[i] == 0x7d){ //did we receive the escape char
+	        switch (buf[i+1]){   // act depending on the char after the escape char
+					
+		    case 0x5e :
+	                received[(*rr)] = 0x7e;
+		        break;
+							   
+		    case 0x5d :
+		        received[(*rr)] = 0x7d;
+		        break;
+							
+		    default :
+		        received[(*rr)] = buf[i+1] ^ 0x20;
+		        break;
+	        }
+		    i++;
+	    }
+	    else { 
+               received[(*rr)] = buf[i];
+            }
+	    if (debug == 1) printf("%02x ", received[(*rr)]);
+	    (*rr)++;
+	}
+        fix_length_received( received, rr );
+	if (debug == 1) {
+	    printf("\n");
+            for( i=0;i<(*rr); i++ ) printf("%02x ", received[(i)]);
+        }
+	if (debug == 1) printf("\n\n");
+    }	
+    return 0;
+}
 int select_str(char *s)
 {
     int i;
@@ -569,8 +673,45 @@ int  SetInverterType( ConfType *conf, char *InverterCode )
     }
 }
 
+//Convert a recieved string to a value
+int ConvertStreamtoFloat( unsigned char * stream, int length, float * value )
+{
+   int	i, nullvalue;
+   
+   (*value) = 0;
+   nullvalue = 1;
+
+   for( i=0; i < length; i++ ) 
+   {
+      if( stream[i] != 0xff ) //check if all ffs which is a null value 
+        nullvalue = 0;
+      (*value) = (*value) + stream[i]*pow(256,i);
+   }
+   if( nullvalue == 1 )
+      (*value) = 0; //Asigning null to 0 at this stage unless it breaks something
+   return 1;
+}
+
+//Convert a recieved string to a value
+int ConvertStreamtoInt( unsigned char * stream, int length, int * value )
+{
+   int	i, nullvalue;
+   
+   (*value) = 0;
+   nullvalue = 1;
+
+   for( i=0; i < length; i++ ) 
+   {
+      if( stream[i] != 0xff ) //check if all ffs which is a null value 
+        nullvalue = 0;
+      (*value) = (*value) + stream[i]*pow(256,i);
+   }
+   if( nullvalue == 1 )
+      (*value) = 0; //Asigning null to 0 at this stage unless it breaks something
+   return 1;
+}
 // Set switches to save lots of strcmps
-int  SetSwitches( ConfType *conf, int *location, int *mysql, int *post, int *file )  
+int  SetSwitches( ConfType *conf, char * datefrom, char * dateto, int *location, int *mysql, int *post, int *file, int *daterange )  
 {
     //Check if all location variables are set
     if(( conf->latitude_f <= 180 )&&( conf->longitude_f <= 180 ))
@@ -597,6 +738,77 @@ int  SetSwitches( ConfType *conf, int *location, int *mysql, int *post, int *fil
         (*post)=1;
     else
         (*post)=0;
+    if(( strlen(datefrom) > 0 )
+	 &&( strlen(dateto) > 0 ))
+        (*daterange)=1;
+    else
+        (*daterange)=0;
+}
+
+int ReadStream( ConfType * conf, int * s, unsigned char * stream, int * streamlen, unsigned char * datalist, int * datalen, int * terminated )
+{
+   int	togo;
+   int	finished;
+   int	finished_record;
+   int  i, j=0;
+
+   togo=ConvertStreamtoInt( stream+43, 2, &togo );
+   if( debug==1 ) printf( "togo=%d\n", togo );
+   i=59; //Initial position of data stream
+   finished=0;
+   finished_record=0;
+   while( finished != 1 ) {
+     while( finished_record != 1 ) {
+        if( i> 500 ) break; //Somthing has gone wrong
+        //printf( "\ngetting data i=%d j=%d rr=%d", i, j, length );
+        if(( i < (*streamlen) )&&(( (*terminated) != 1)||(i+3 < (*streamlen) ))) 
+	{
+           datalist[j]=stream[i];
+           j++;
+           (*datalen)=j;
+           i++;
+        }
+        else
+           finished_record = 1;
+           
+     }
+     if( terminated == 0 )
+     {
+         read_bluetooth( conf, s, streamlen, stream, terminated );
+         if( (*terminated) == 0 )
+             i=18;
+         else
+             i=59;
+     }
+     else
+         finished = 1;
+   }
+   if( debug== 1 ) {
+     printf( "len=%d data=", (*datalen) );
+     for( i=0; i< (*datalen); i++ )
+        printf( "%02x ", datalist[i] );
+     printf( "\n" );
+   }
+}
+
+/* Init Config to default values */
+int InitConfig( ConfType *conf )
+{
+    strcpy( conf->Config,"./smatool.conf");
+    strcpy( conf->Inverter, "" );  
+    strcpy( conf->BTAddress, "" );  
+    conf->bt_timeout = 5;  
+    strcpy( conf->Password, "0000" );  
+    strcpy( conf->File, "sma.in.new" );  
+    conf->latitude_f = 999 ;  
+    conf->longitude_f = 999 ;  
+    strcpy( conf->MySqlHost, "localhost" );  
+    strcpy( conf->MySqlDatabase, "smatool" );  
+    strcpy( conf->MySqlUser, "" );  
+    strcpy( conf->MySqlPwd, "" );  
+    strcpy( conf->PVOutputURL, "http://pvoutput.org/service/r1/addstatus.jsp" );  
+    strcpy( conf->PVOutputKey, "" );  
+    strcpy( conf->PVOutputSid, "" );  
 }
 
 /* read Config from file */
@@ -622,6 +834,8 @@ int GetConfig( ConfType *conf )
                    strcpy( conf->Inverter, value );  
                 if( strcmp( variable, "BTAddress" ) == 0 )
                    strcpy( conf->BTAddress, value );  
+                if( strcmp( variable, "BTTimeout" ) == 0 )
+                   conf->bt_timeout =  atoi(value);  
                 if( strcmp( variable, "Password" ) == 0 )
                    strcpy( conf->Password, value );  
                 if( strcmp( variable, "File" ) == 0 )
@@ -650,6 +864,194 @@ int GetConfig( ConfType *conf )
     fclose( fp );
 }
 
+/* Print a help message */
+int PrintHelp()
+{
+    printf( "Usage: smatool [OPTION]\n" );
+    printf( "  -v,  --verbose                           Give more verbose output\n" );
+    printf( "  -d,  --debug                             Show debug\n" );
+    printf( "\n" );
+    printf( "  -from  --datefrom YYYY-DD-MM HH:MM:00    Date range from date\n" );
+    printf( "  -to  --dateto YYYY-DD-MM HH:MM:00        Date range to date\n" );
+    printf( "\n" );
+    printf( "The following options are in config file but may be overridden\n" );
+    printf( "  -i,  --inverter INVERTER_MODEL           inverter model\n" );
+    printf( "  -a,  --address INVERTER_ADDRESS          inverter BT address\n" );
+    printf( "  -t,  --timeout TIMEOUT                   bluetooth timeout (secs) default 5\n" );
+    printf( "  -p,  --password PASSWORD                 inverter user password default 0000\n" );
+    printf( "  -f,  --file FILENAME                     command file default sma.in.new\n" );
+    printf( "Location Information to calculate sunset and sunrise so inverter is not\n" );
+    printf( "queried in the dark\n" );
+    printf( "  -lat,  --latitude LATITUDE               location latitude -180 to 180 deg\n" );
+    printf( "  -lon,  --longitude LONGITUDE             location longitude -90 to 90 deg\n" );
+    printf( "Mysql database information\n" );
+    printf( "  -H,  --mysqlhost MYSQLHOST               mysql host default localhost\n");
+    printf( "  -D,  --mysqldb MYSQLDATBASE              mysql database default smatool\n");
+    printf( "  -U,  --mysqluser MYSQLUSER               mysql user\n");
+    printf( "  -P,  --mysqlpwd MYSQLPASSWORD            mysql password\n");
+    printf( "PVOutput.org (A free solar information system) Configs\n" );
+    printf( "  -url,  --pvouturl PVOUTURL               pvoutput.org live url\n");
+    printf( "  -key,  --pvoutkey PVOUTKEY               pvoutput.org key\n");
+    printf( "  -sid,  --pvoutsid PVOUTSID               pvoutput.org sid\n");
+    printf( "  -repost                                  verify and repost data if different\n");
+    printf( "\n\n" );
+}
+
+/* Read the command args that need to be read first */
+int PreReadCommandConfig( ConfType *conf, int argc, char **argv, int * verbose, int * debug   )
+{
+    int	i;
+
+    // these need validation checking at some stage TODO
+    for (i=1;i<argc;i++)			//Read through passed arguments
+    {
+	if ((strcmp(argv[i],"-v")==0)||(strcmp(argv[i],"--verbose")==0)) (*verbose) = 1;
+	if ((strcmp(argv[i],"-d")==0)||(strcmp(argv[i],"--debug")==0)) (*debug) = 1;
+	if ((strcmp(argv[i],"-c")==0)||(strcmp(argv[i],"--config")==0)){
+	    i++;
+	    if(i<argc){
+		strncpy(conf->Config,argv[i], sizeof(conf->Config));
+	    }
+	}
+	if ((strcmp(argv[i],"-h")==0) || (strcmp(argv[i],"--help") == 0 ))
+        {
+           PrintHelp();
+           return( -1 );
+        }
+    }
+    return( 0 );
+}
+
+/* Init Config to default values */
+int ReadCommandConfig( ConfType *conf, int argc, char **argv, char * datefrom, char * dateto, int * verbose, int * debug, int * repost   )
+{
+    int	i;
+
+    // these need validation checking at some stage TODO
+    for (i=1;i<argc;i++)			//Read through passed arguments
+    {
+	if ((strcmp(argv[i],"-v")==0)||(strcmp(argv[i],"--verbose")==0)) (*verbose) = 1;
+	else if ((strcmp(argv[i],"-d")==0)||(strcmp(argv[i],"--debug")==0)) (*debug) = 1;
+	else if ((strcmp(argv[i],"-c")==0)||(strcmp(argv[i],"--config")==0)){
+	    i++;
+	    if(i<argc){
+		strncpy(conf->Config,argv[i], sizeof(conf->Config));
+	    }
+	}
+	else if ((strcmp(argv[i],"-from")==0)||(strcmp(argv[i],"--datefrom")==0)){
+	    i++;
+	    if(i<argc){
+		strcpy(datefrom,argv[i]);
+	    }
+	}
+	else if ((strcmp(argv[i],"-to")==0)||(strcmp(argv[i],"--dateto")==0)){
+	    i++;
+	    if(i<argc){
+		strcpy(dateto,argv[i]);
+	    }
+	}
+	else if (strcmp(argv[i],"-repost")==0){
+	    i++;
+            (*repost)=1;
+	}
+        else if ((strcmp(argv[i],"-i")==0)||(strcmp(argv[i],"--inverter")==0)){
+            i++;
+            if (i<argc){
+	        strcpy(conf->Inverter,argv[i]);
+            }
+	}
+        else if ((strcmp(argv[i],"-a")==0)||(strcmp(argv[i],"--address")==0)){
+            i++;
+            if (i<argc){
+	        strcpy(conf->BTAddress,argv[i]);
+            }
+	}
+        else if ((strcmp(argv[i],"-t")==0)||(strcmp(argv[i],"--timeout")==0)){
+            i++;
+            if (i<argc){
+	        conf->bt_timeout = atoi(argv[i]);
+            }
+	}
+        else if ((strcmp(argv[i],"-p")==0)||(strcmp(argv[i],"--password")==0)){
+            i++;
+            if (i<argc){
+	        strcpy(conf->Password,argv[i]);
+            }
+	}
+        else if ((strcmp(argv[i],"-f")==0)||(strcmp(argv[i],"--file")==0)){
+            i++;
+            if (i<argc){
+	        strcpy(conf->File,argv[i]);
+            }
+	}
+	else if ((strcmp(argv[i],"-lat")==0)||(strcmp(argv[i],"--latitude")==0)){
+	    i++;
+	    if(i<argc){
+		conf->latitude_f=atof(argv[i]);
+	    }
+	}
+	else if ((strcmp(argv[i],"-long")==0)||(strcmp(argv[i],"--longitude")==0)){
+	    i++;
+	    if(i<argc){
+		conf->longitude_f=atof(argv[i]);
+	    }
+	}
+	else if ((strcmp(argv[i],"-H")==0)||(strcmp(argv[i],"--mysqlhost")==0)){
+            i++;
+            if (i<argc){
+		strcpy(conf->MySqlHost,argv[i]);
+            }
+        }
+	else if ((strcmp(argv[i],"-D")==0)||(strcmp(argv[i],"--mysqlcwdb")==0)){
+            i++;
+            if (i<argc){
+		strcpy(conf->MySqlDatabase,argv[i]);
+            }
+        }
+	else if ((strcmp(argv[i],"-U")==0)||(strcmp(argv[i],"--mysqluser")==0)){
+            i++;
+            if (i<argc){
+		strcpy(conf->MySqlUser,argv[i]);
+            }
+        }
+	else if ((strcmp(argv[i],"-P")==0)||(strcmp(argv[i],"--mysqlpwd")==0)){
+            i++;
+            if (i<argc){
+		strcpy(conf->MySqlPwd,argv[i]);
+            }
+	}				
+	else if ((strcmp(argv[i],"-url")==0)||(strcmp(argv[i],"--pvouturl")==0)){
+	    i++;
+	    if(i<argc){
+		strcpy(conf->PVOutputURL,argv[i]);
+	    }
+	}
+	else if ((strcmp(argv[i],"-key")==0)||(strcmp(argv[i],"--pvoutkey")==0)){
+	    i++;
+	    if(i<argc){
+		strcpy(conf->PVOutputKey,argv[i]);
+	    }
+	}
+	else if ((strcmp(argv[i],"-sid")==0)||(strcmp(argv[i],"--pvoutsid")==0)){
+	    i++;
+	    if(i<argc){
+		strcpy(conf->PVOutputSid,argv[i]);
+	    }
+	}
+        else
+        {
+           printf("Bad Syntax\n\n" );
+           for( i=0; i< argc; i++ )
+             printf( "%s ", argv[i] );
+           printf( "\n\n" );
+          
+           PrintHelp();
+           return( -1 );
+        }
+    }
+    return( 0 );
+}
+
 size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) 
 {
     size_t written;
@@ -665,9 +1067,12 @@ int main(int argc, char **argv)
 	struct sockaddr_rc addr = { 0 };
 	unsigned char received[1024];
 	unsigned char datarecord[1024];
+	unsigned char data[1024];
+        int datalen = 0;
         int archdatalen=0;
         int failedbluetooth=0;
-	int s,i,j,status,mysql=0,post=0,repost=0,file=0,from=0,to=0;
+        int terminated=0;
+	int s,i,j,status,mysql=0,post=0,repost=0,file=0,daterange=0;
         int location=0, error=0;
 	int ret,found,crc_at_end,last, finished=0;
         int togo=0;
@@ -718,110 +1123,27 @@ int main(int argc, char **argv)
       float  current_value;
    } *archdatalist;
 
-   char sunrise_time[6],sunset_time[6];
+    char sunrise_time[6],sunset_time[6];
    
-   CURL *curl;
-   CURLcode result;
+    CURL *curl;
+    CURLcode result;
 
-   memset(received,0,1024);
-   /* get the report time - used in various places */
-   reporttime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
-   //reporttime = 1292823628;
+    memset(received,0,1024);
+    /* get the report time - used in various places */
+    reporttime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
    
-    for (i=1;i<argc;i++)			//Read through passed arguments
-    {
-        if (strcmp(argv[i],"-address")==0){
-            i++;
-            if (i<argc){
-	        strcpy(conf.BTAddress,argv[i]);
-            }
-	}
-	if (strcmp(argv[i],"-u")==0){
-            i++;
-            if (i<argc){
-		strcpy(conf.MySqlUser,argv[i]);
-            }
-        }
-	if (strcmp(argv[i],"-p")==0){
-            i++;
-            if (i<argc){
-		strcpy(conf.MySqlPwd,argv[i]);
-            }
-	}				
-	if (strcmp(argv[i],"-v")==0) verbose = 1;
-	if (strcmp(argv[i],"-debug")==0) debug = 1;
-	if (strcmp(argv[i],"-mysql")==0) mysql=1;
-	if (strcmp(argv[i],"-post")==0){
-	    i++;
-	    if(i<argc){
-		strcpy(conf.PVOutputURL,argv[i]);
-	    }
-	}
-	if (strcmp(argv[i],"-repost")==0){
-	    i++;
-            repost=1;
-	}
-	if (strcmp(argv[i],"-pass")==0){
-	    i++;
-	    if(i<argc){
-	        strcpy(conf.Password,argv[i]);
-	    }
-	}
-	if (strcmp(argv[i],"-lat")==0){
-	    i++;
-	    if(i<argc){
-		conf.latitude_f=atof(argv[i]);
-	    }
-	}
-	if (strcmp(argv[i],"-long")==0){
-	    i++;
-	    if(i<argc){
-		conf.longitude_f=atof(argv[i]);
-	    }
-	}
-	if (strcmp(argv[i],"-sid")==0){
-	    i++;
-	    if(i<argc){
-		strcpy(conf.PVOutputSid,argv[i]);
-	    }
-	}
-	if (strcmp(argv[i],"-key")==0){
-	    i++;
-	    if(i<argc){
-		strcpy(conf.PVOutputKey,argv[i]);
-	    }
-	}
-	if (strcmp(argv[i],"-file")==0){
-	    i++;
-	    if(i<argc){
-		strcpy(conf.File,argv[i]);
-	    }
-	}
-	if (strcmp(argv[i],"-conf")==0){
-	    i++;
-	    if(i<argc){
-		strncpy(conf.Config,argv[i], sizeof(conf.Config));
-	    }
-	}
-	if (strcmp(argv[i],"-from")==0){
-	    i++;
-	    if(i<argc){
-		strcpy(datefrom,argv[i]);
-                from = 1;
-	    }
-	}
-	if (strcmp(argv[i],"-to")==0){
-	    i++;
-	    if(i<argc){
-		strcpy(dateto,argv[i]);
-		to  = 1;
-	    }
-	}
-    }
+    // set config to defaults
+    InitConfig( &conf );
+    // read command arguments needed so can get config
+    if( PreReadCommandConfig( &conf, argc, argv, &verbose, &debug ) < 0 )
+        exit(0);
     // read Config file
     GetConfig( &conf );
+    // read command arguments  again - they overide config
+    if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost ) < 0 )
+        exit(0);
     // set switches used through the program
-    SetSwitches( &conf, &location, &mysql, &post, &file );  
+    SetSwitches( &conf, datefrom, dateto, &location, &mysql, &post, &file, &daterange );  
     // Set value for inverter type
     SetInverterType( &conf, unknown );
     // Location based information to avoid quering Inverter in the dark
@@ -833,10 +1155,8 @@ int main(int argc, char **argv)
            update_almanac(  &conf, sunrise_time, sunset_time );
         }
     }
-    if((( from==1 )&&(to==1))&&((location=0)||(mysql==0)||is_light( &conf )))
+    if(( daterange==1 )&&((location=0)||(mysql==0)||is_light( &conf )))
     {
-
-
 	if (verbose ==1) printf("Address %s\n",conf.BTAddress);
 
         if (file ==1)
@@ -930,7 +1250,7 @@ int main(int argc, char **argv)
 			found = 0;
 			do {
                             rr=0;
-                            if( read_bluetooth( &s, &rr, received ) != 0 )
+                            if( read_bluetooth( &conf, &s, &rr, received, &terminated ) != 0 )
                             {
                                fseek( fp, returnpos, 0 );
                                linenum = returnline;
@@ -1058,7 +1378,7 @@ int main(int argc, char **argv)
 
 				case 13: // $TIMEFROM1	
 				// get report time and convert
-                                if( from == 1 ) {
+                                if( daterange == 1 ) {
                                     strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm);
                                     fromtime=mktime(&tm);
                                     if( fromtime == -1 ) {
@@ -1085,7 +1405,7 @@ int main(int argc, char **argv)
 				break;
 
 				case 14: // $TIMETO1	
-                                if( to == 1 ) {
+                                if( daterange == 1 ) {
                                     strptime( dateto, "%Y-%m-%d %H:%M:%S", &tm);
                                     totime=mktime(&tm);
                                     if( totime == -1 ) {
@@ -1110,7 +1430,7 @@ int main(int argc, char **argv)
 				break;
 
 				case 15: // $TIMEFROM2	
-                                if( from == 1 ) {
+                                if( daterange == 1 ) {
                                     strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm);
                                     fromtime=mktime(&tm)-86400;
                                     if( fromtime == -1 ) {
@@ -1137,7 +1457,7 @@ int main(int argc, char **argv)
 				break;
 
 				case 16: // $TIMETO2	
-                                if( to == 1 ) {
+                                if( daterange == 1 ) {
                                     strptime( dateto, "%Y-%m-%d %H:%M:%S", &tm);
 
                                     totime=mktime(&tm)-86400;
@@ -1218,10 +1538,18 @@ int main(int argc, char **argv)
 				switch(select_str(lineread)) {
                               
                                 case 3: // Extract Serial of Inverter
-                                serial[3]=received[78];
-                                serial[2]=received[77];
-                                serial[1]=received[76];
-                                serial[0]=received[75];
+                               
+                                ReadStream( &conf, &s, received, &rr, data, &datalen, &terminated );
+				/*
+                                printf( "len=%d data=", datalen );
+                                for( i=0; i< datalen; i++ )
+                                  printf( "%02x ", data[i] );
+                                printf( "\n" );
+                                */
+                                serial[3]=data[19];
+                                serial[2]=data[18];
+                                serial[1]=data[17];
+                                serial[0]=data[16];
 			        if (verbose	== 1) printf( "serial=%02x:%02x:%02x:%02x\n",serial[3]&0xff,serial[2]&0xff,serial[1]&0xff,serial[0]&0xff ); 
                                 break;
                                 
@@ -1335,8 +1663,8 @@ int main(int argc, char **argv)
                                          hour = loctime->tm_hour;
                                          minute = loctime->tm_min; 
                                          second = loctime->tm_sec; 
-				         gtotal = (datarecord[6] * 65536) + (datarecord[5] * 256) + datarecord[4];
-                                         if( ptotal == 0 )
+                                         ConvertStreamtoFloat( datarecord+4, 8, &gtotal );
+                                         if(archdatalen == 0 )
                                             ptotal = gtotal;
 	                                 if (verbose == 1) printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts togo=%d i=%d crc=%d", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12, togo, i, crc_at_end);
                                          if( idate != prev_idate+300 ) {
@@ -1363,7 +1691,7 @@ int main(int argc, char **argv)
                                            last = 0;
                                            break;
                                         }
-                                        if( read_bluetooth( &s, &rr, received ) != 0 )
+                                        if( read_bluetooth( &conf, &s, &rr, received, &terminated ) != 0 )
                                         {
                                            fseek( fp, returnpos, 0 );
                                            linenum = returnline;
@@ -1394,7 +1722,7 @@ int main(int argc, char **argv)
                                            }
                                            else
                                              i=18;
-                                           if( received[rr-1] == 0x7e )
+                                           if( terminated == 1 )
                                               crc_at_end = 1;
                                            break;
                                              
@@ -1406,7 +1734,8 @@ int main(int argc, char **argv)
                                            }
                                            else
                                              i=18;
-                                           crc_at_end=1;
+                                           if( terminated == 1 )
+                                              crc_at_end = 1;
                                            if( togo == 0 )
                                              last=1;
                                            break;
@@ -1618,103 +1947,4 @@ if ((repost ==1)&&(error==0)){
 }
 
 return 0;
-}
-
-int
-read_bluetooth( int *s, int *rr, unsigned char *received )
-{
-    int bytes_read,i,j;
-    unsigned char buf[1024]; //read buffer
-    unsigned char header[3]; //read buffer
-    struct timeval tv;
-    fd_set readfds;
-
-    tv.tv_sec = 10; // set timeout of reading to 5 seconds
-    tv.tv_usec = 0;
-    memset(buf,0,1024);
-
-    FD_ZERO(&readfds);
-    FD_SET((*s), &readfds);
-				
-    select((*s)+1, &readfds, NULL, NULL, &tv);
-				
-    // first read the header to get the record length
-    if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
-        bytes_read = recv((*s), header, sizeof(header), 0); //Get length of string
-	(*rr) = 0;
-        for( i=0; i<sizeof(header); i++ ) {
-            received[(*rr)] = header[i];
-	    if (debug == 1) printf("%02x ", received[(*rr)]);
-            (*rr)++;
-        }
-    }
-    else
-    {
-       if( verbose==1) printf("Timeout reading bluetooth socket\n");
-       (*rr) = 0;
-       memset(received,0,1024);
-       return -1;
-    }
-    if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
-        bytes_read = recv((*s), buf, header[1]-3, 0); //Read the length specified by header
-    }
-    else
-    {
-       if( verbose==1) printf("Timeout reading bluetooth socket\n");
-       (*rr) = 0;
-       memset(received,0,1024);
-       return -1;
-    }
-    if ( bytes_read > 0){
-        if (debug == 1) printf("\nReceiving\n");
-	if (debug == 1){ 
-           printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
-           j=12;
-           for( i=0; i<sizeof(header); i++ ) {
-              if( j%16== 0 )
-                 printf( "\n    %08x: ",j);
-              printf("%02x ",header[i]);
-              j++;
-           }
-	   for (i=0;i<bytes_read;i++) {
-              if( j%16== 0 )
-                 printf( "\n    %08x: ",j);
-              printf("%02x ",buf[i]);
-              j++;
-           }
-           printf(" rr=%d",(bytes_read+(*rr)));
-	   printf("\n\n");
-   }
-        for (i=0;i<bytes_read;i++){ //start copy the rec buffer in to received
-            if (buf[i] == 0x7d){ //did we receive the escape char
-	        switch (buf[i+1]){   // act depending on the char after the escape char
-					
-		    case 0x5e :
-	                received[(*rr)] = 0x7e;
-		        break;
-							   
-		    case 0x5d :
-		        received[(*rr)] = 0x7d;
-		        break;
-							
-		    default :
-		        received[(*rr)] = buf[i+1] ^ 0x20;
-		        break;
-	        }
-		    i++;
-	    }
-	    else { 
-               received[(*rr)] = buf[i];
-            }
-	    if (debug == 1) printf("%02x ", received[(*rr)]);
-	    (*rr)++;
-	}
-        fix_length_received( received, rr );
-	if (debug == 1) {
-	    printf("\n");
-            for( i=0;i<(*rr); i++ ) printf("%02x ", received[(i)]);
-        }
-	if (debug == 1) printf("\n\n");
-    }	
-    return 0;
 }

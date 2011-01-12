@@ -1,11 +1,16 @@
 # Configuration for smatoool bluetooth inverter logger
 #
+# Copy this to smatool.conf this is to avoid damaging your 
+# config on every update
+#
 # Not all fields are compulsory
 #
 # Inverter (compulsory) type 3000TL, 5000TL others not tested
 Inverter	3000TL
 # Inverter (compulsory bluetooth address) use "hcitool scan" to find
 BTAddress
+# Inverter Bluetooth timeout (optional) defaults to 5 seconds
+BTTimeout
 # Inverter User password (compulsory)
 Password
 # Config file (optional) defaults to ./smatool.conf
