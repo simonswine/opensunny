@@ -42,8 +42,9 @@ typedef u_int16_t u16;
 #define PPPINITFCS16 0xffff /* Initial FCS value    */
 #define PPPGOODFCS16 0xf0b8 /* Good final FCS value */
 #define ASSERT(x) assert(x)
+#define SCHEMA "1"  //Current database schema
 
-typedef struct {
+typedef struct{
     char Inverter[20]; 		//--inverter 	-i
     char BTAddress[20];         //--address  	-a
     int  bt_timeout;		//--timeout  	-t
@@ -52,7 +53,7 @@ typedef struct {
     char File[80];              //--file     	-f
     float latitude_f;           //--latitude  	-la
     float longitude_f;          //--longitude 	-lo
-    char MySqlHost[20];         //--mysqlhost   -h
+    char MySqlHost[40];         //--mysqlhost   -h
     char MySqlDatabase[20];     //--mysqldb     -d
     char MySqlUser[80];         //--mysqluser   -user
     char MySqlPwd[80];          //--mysqlpwd    -pwd
@@ -593,6 +594,108 @@ char * sunset( float latitude, float longitude )
    return returntime;
 }
 
+int install_mysql_tables( ConfType * conf )
+/*  Do initial mysql table creationsa */
+{
+    int	        found=0;
+    MYSQL_ROW 	row;
+    char 	SQLQUERY[1000];
+
+    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, "mysql");
+    //Get Start of day value
+    sprintf(SQLQUERY,"SHOW DATABASES" );
+    if (debug == 1) printf("%s\n",SQLQUERY);
+    DoQuery(SQLQUERY);
+    while (row = mysql_fetch_row(res))  //if there is a result, update the row
+    {
+       if( strcmp( row[0], conf->MySqlDatabase ) == 0 )
+       {
+          found=1;
+          printf( "Database exists - exiting" );
+       }
+    }
+    if( found == 0 )
+    {
+       sprintf( SQLQUERY,"CREATE DATABASE IF NOT EXISTS %s", conf->MySqlDatabase );
+       if (debug == 1) printf("%s\n",SQLQUERY);
+       DoQuery(SQLQUERY);
+
+       sprintf( SQLQUERY,"USE  %s", conf->MySqlDatabase );
+       if (debug == 1) printf("%s\n",SQLQUERY);
+       DoQuery(SQLQUERY);
+
+       sprintf( SQLQUERY,"CREATE TABLE `Almanac` ( `id` bigint(20) NOT NULL \
+          AUTO_INCREMENT, \
+          `date` date NOT NULL,\
+          `sunrise` datetime DEFAULT NULL,\
+          `sunset` datetime DEFAULT NULL,\
+          `CHANGETIME` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, \
+           PRIMARY KEY (`id`),\
+           UNIQUE KEY `date` (`date`)\
+           ) ENGINE=MyISAM" );
+
+       if (debug == 1) printf("%s\n",SQLQUERY);
+       DoQuery(SQLQUERY);
+  
+       sprintf( SQLQUERY, "CREATE TABLE `DayData` ( \
+           `DateTime` datetime NOT NULL, \
+           `Inverter` varchar(10) NOT NULL, \
+           `Serial` varchar(40) NOT NULL, \
+           `CurrentPower` int(11) DEFAULT NULL, \
+           `ETotalToday` float DEFAULT NULL, \
+           `PVOutput` datetime DEFAULT NULL, \
+           `CHANGETIME` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00' ON UPDATE CURRENT_TIMESTAMP, \
+           PRIMARY KEY (`DateTime`,`Inverter`,`Serial`) \
+           ) ENGINE=MyISAM" );
+
+       if (debug == 1) printf("%s\n",SQLQUERY);
+       DoQuery(SQLQUERY);
+
+       sprintf( SQLQUERY, "CREATE TABLE `settings` ( \
+           `value` varchar(128) NOT NULL, \
+           `data` varchar(500) NOT NULL, \
+           PRIMARY KEY (`value`) \
+           ) ENGINE=MyISAM" );
+
+       if (debug == 1) printf("%s\n",SQLQUERY);
+       DoQuery(SQLQUERY);
+        
+       
+       sprintf( SQLQUERY, "INSERT INTO `settings` SET `value` = \'schema\', `data` = \'%s\' ", SCHEMA );
+
+       if (debug == 1) printf("%s\n",SQLQUERY);
+       DoQuery(SQLQUERY);
+    }
+    CloseMySqlDatabase();
+
+    return found;
+}
+
+int check_schema( ConfType * conf )
+/*  Check if using the correct database schema */
+{
+    int	        found=0;
+    MYSQL_ROW 	row;
+    char 	SQLQUERY[200];
+
+    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
+    //Get Start of day value
+    sprintf(SQLQUERY,"SELECT data FROM settings WHERE value=\'schema\' " );
+    if (debug == 1) printf("%s\n",SQLQUERY);
+    DoQuery(SQLQUERY);
+    if (row = mysql_fetch_row(res))  //if there is a result, update the row
+    {
+       if( strcmp( row[0], SCHEMA ) == 0 )
+          found=1;
+    }
+    mysql_close(conn);
+    if( found != 1 )
+    {
+       printf( "Please Update database schema\n" );
+    }
+    return found;
+}
+
 int todays_almanac( ConfType *conf )
 /*  Check if sunset and sunrise have been set today */
 {
@@ -671,6 +774,24 @@ int  SetInverterType( ConfType *conf, char *InverterCode )
         InverterCode[2] = 0xfb;
         InverterCode[3] = 0x39;
     }
+}
+//Convert a recieved string to a value
+int ConvertStreamtoLong( unsigned char * stream, int length, long unsigned int * value )
+{
+   int	i, nullvalue;
+   
+   (*value) = 0;
+   nullvalue = 1;
+
+   for( i=0; i < length; i++ ) 
+   {
+      if( stream[i] != 0xff ) //check if all ffs which is a null value 
+        nullvalue = 0;
+      (*value) = (*value) + stream[i]*pow(256,i);
+   }
+   if( nullvalue == 1 )
+      (*value) = 0; //Asigning null to 0 at this stage unless it breaks something
+   return 0;
 }
 
 //Convert a recieved string to a value
@@ -820,9 +941,21 @@ int GetConfig( ConfType *conf )
     char	value[400];
 
     if (strlen(conf->Config) > 0 )
-        fp=fopen(conf->Config,"r");
+    {
+        if(( fp=fopen(conf->Config,"r")) == (FILE *)NULL )
+        {
+           printf( "Error! Could not open file %s\n", conf->Config );
+           return( -1 ); //Could not open file
+        }
+    }
     else
-        fp=fopen("./smatool.conf","r");
+    {
+        if(( fp=fopen("./smatool.conf","r")) == (FILE *)NULL )
+        {
+           printf( "Error! Could not open file ./smatool.conf\n" );
+           return( -1 ); //Could not open file
+        }
+    }
     while (!feof(fp)){	
 	if (fgets(line,400,fp) != NULL){				//read line from smatool.conf
             if( line[0] != '#' ) 
@@ -862,6 +995,7 @@ int GetConfig( ConfType *conf )
         }
     }
     fclose( fp );
+    return( 0 );
 }
 
 /* Print a help message */
@@ -870,6 +1004,7 @@ int PrintHelp()
     printf( "Usage: smatool [OPTION]\n" );
     printf( "  -v,  --verbose                           Give more verbose output\n" );
     printf( "  -d,  --debug                             Show debug\n" );
+    printf( "  -c,  --config CONFIGFILE                 Set config file default smatool.conf\n" );
     printf( "\n" );
     printf( "  -from  --datefrom YYYY-DD-MM HH:MM:00    Date range from date\n" );
     printf( "  -to  --dateto YYYY-DD-MM HH:MM:00        Date range to date\n" );
@@ -889,6 +1024,9 @@ int PrintHelp()
     printf( "  -D,  --mysqldb MYSQLDATBASE              mysql database default smatool\n");
     printf( "  -U,  --mysqluser MYSQLUSER               mysql user\n");
     printf( "  -P,  --mysqlpwd MYSQLPASSWORD            mysql password\n");
+    printf( "Mysql tables can be installed using INSTALL you may have to use a higher \n" );
+    printf( "privelege user to allow the creation of databases and tables, use command line \n" );
+    printf( "       --INSTALL                           install mysql data tables\n");
     printf( "PVOutput.org (A free solar information system) Configs\n" );
     printf( "  -url,  --pvouturl PVOUTURL               pvoutput.org live url\n");
     printf( "  -key,  --pvoutkey PVOUTKEY               pvoutput.org key\n");
@@ -910,7 +1048,7 @@ int PreReadCommandConfig( ConfType *conf, int argc, char **argv, int * verbose, 
 	if ((strcmp(argv[i],"-c")==0)||(strcmp(argv[i],"--config")==0)){
 	    i++;
 	    if(i<argc){
-		strncpy(conf->Config,argv[i], sizeof(conf->Config));
+		strcpy(conf->Config,argv[i]);
 	    }
 	}
 	if ((strcmp(argv[i],"-h")==0) || (strcmp(argv[i],"--help") == 0 ))
@@ -935,7 +1073,7 @@ int ReadCommandConfig( ConfType *conf, int argc, char **argv, char * datefrom, c
 	else if ((strcmp(argv[i],"-c")==0)||(strcmp(argv[i],"--config")==0)){
 	    i++;
 	    if(i<argc){
-		strncpy(conf->Config,argv[i], sizeof(conf->Config));
+		strcpy(conf->Config,argv[i]);
 	    }
 	}
 	else if ((strcmp(argv[i],"-from")==0)||(strcmp(argv[i],"--datefrom")==0)){
@@ -1038,6 +1176,22 @@ int ReadCommandConfig( ConfType *conf, int argc, char **argv, char * datefrom, c
 		strcpy(conf->PVOutputSid,argv[i]);
 	    }
 	}
+	else if ((strcmp(argv[i],"-h")==0) || (strcmp(argv[i],"--help") == 0 ))
+        {
+           PrintHelp();
+           return( -1 );
+        }
+	else if (strcmp(argv[i],"--INSTALL")==0)
+        {
+           if(( strlen( conf->MySqlUser ) > 0 ) &&
+              ( strlen( conf->MySqlPwd ) > 0 ) &&
+              ( strlen( conf->MySqlHost ) > 0 ) &&
+              ( strlen( conf->MySqlDatabase ) > 0 ))
+             install_mysql_tables( conf );
+           else
+             printf( "--INSTALL MUST be the last argument\n" );
+           return( -1 );
+        }
         else
         {
            printf("Bad Syntax\n\n" );
@@ -1119,6 +1273,8 @@ int main(int argc, char **argv)
    struct archdata_type
    {
       time_t date;
+      char   inverter[20];
+      long unsigned int serial;
       float  accum_value;
       float  current_value;
    } *archdatalist;
@@ -1135,10 +1291,12 @@ int main(int argc, char **argv)
     // set config to defaults
     InitConfig( &conf );
     // read command arguments needed so can get config
-    if( PreReadCommandConfig( &conf, argc, argv, &verbose, &debug ) < 0 )
+    if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost ) < 0 )
+    //if( PreReadCommandConfig( &conf, argc, argv, &verbose, &debug ) < 0 )
         exit(0);
     // read Config file
-    GetConfig( &conf );
+    if( GetConfig( &conf ) < 0 )
+        exit(-1);
     // read command arguments  again - they overide config
     if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost ) < 0 )
         exit(0);
@@ -1155,6 +1313,9 @@ int main(int argc, char **argv)
            update_almanac(  &conf, sunrise_time, sunset_time );
         }
     }
+    if( mysql==1 ) 
+       if( check_schema( &conf ) != 1 )
+          exit(-1);
     if(( daterange==1 )&&((location=0)||(mysql==0)||is_light( &conf )))
     {
 	if (verbose ==1) printf("Address %s\n",conf.BTAddress);
@@ -1676,7 +1837,9 @@ int main(int argc, char **argv)
                                             archdatalist = (struct archdata_type *)malloc( sizeof( struct archdata_type ) );
                                          else
                                             archdatalist = (struct archdata_type *)realloc( archdatalist, sizeof( struct archdata_type )*(archdatalen+1));
-                                         (archdatalist+archdatalen)->date=idate;
+					 (archdatalist+archdatalen)->date=idate;
+                                         strcpy((archdatalist+archdatalen)->inverter,conf.Inverter);
+                                         ConvertStreamtoLong( serial, 4, &(archdatalist+archdatalen)->serial);
                                          (archdatalist+archdatalen)->accum_value=gtotal/1000;
                                          (archdatalist+archdatalen)->current_value=(gtotal-ptotal)*12;
                                          archdatalen++;
@@ -1785,7 +1948,7 @@ int main(int argc, char **argv)
         OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
         for( i=1; i<archdatalen; i++ ) //Start at 1 as the first record is a dummy
         {
-	    sprintf(SQLQUERY,"INSERT INTO DayData ( DateTime, CurrentPower, EtotalToday ) VALUES ( FROM_UNIXTIME(%ld), %0.f, %.3f ) ON DUPLICATE KEY UPDATE DateTime=Datetime, CurrentPower=VALUES(CurrentPower), EtotalToday=VALUES(EtotalToday)",(archdatalist+i)->date, (archdatalist+i)->current_value, (archdatalist+i)->accum_value );
+	    sprintf(SQLQUERY,"INSERT INTO DayData ( DateTime, Inverter, Serial, CurrentPower, EtotalToday ) VALUES ( FROM_UNIXTIME(%ld),\'%s\',%d,%0.f, %.3f ) ON DUPLICATE KEY UPDATE DateTime=Datetime, Inverter=VALUES(Inverter), Serial=VALUES(Serial), CurrentPower=VALUES(CurrentPower), EtotalToday=VALUES(EtotalToday)",(archdatalist+i)->date, (archdatalist+i)->inverter, (archdatalist+i)->serial, (archdatalist+i)->current_value, (archdatalist+i)->accum_value );
 	    if (debug == 1) printf("%s\n",SQLQUERY);
 	    DoQuery(SQLQUERY);
         }
