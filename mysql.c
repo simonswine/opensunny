@@ -23,13 +23,13 @@ void OpenMySqlDatabase (char *server, char *user, char *password, char *database
 
 void CloseMySqlDatabase()
 {
-   //* Release memory used to store results and close connection */
+   /* Release memory used to store results and close connection */
    mysql_free_result(res);
    mysql_close(conn);
 }
 
 int DoQuery (char query[1000]){
-	// execute query
+	/* execute query */
 	
 	if (mysql_real_query(conn, query, strlen(query))){
 		fprintf(stderr, "%s\n", mysql_error(conn));
