@@ -27,7 +27,6 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include <time.h>
 #include <assert.h>
 #include <sys/types.h>
 #include <curl/curl.h>
@@ -43,6 +42,8 @@ typedef u_int16_t u16;
 #define PPPGOODFCS16 0xf0b8 /* Good final FCS value */
 #define ASSERT(x) assert(x)
 #define SCHEMA "1"  /* Current database schema */
+#define _XOPEN_SOURCE /* glibc2 needs this */
+
 
 typedef struct{
     char Inverter[20]; 		/*--inverter 	-i 	*/
@@ -203,6 +204,7 @@ fix_length_send(unsigned char *cp, int *len)
       switch( cp[1] ) {
         case 0x3a: cp[3]=0x44; break;
         case 0x3e: cp[3]=0x40; break;
+        case 0x3f: cp[3]=0x41; break;
         case 0x40: cp[3]=0x3e; break;
         case 0x41: cp[3]=0x3f; break;
         case 0x42: cp[3]=0x3c; break;
@@ -210,6 +212,7 @@ fix_length_send(unsigned char *cp, int *len)
         case 0x53: cp[3]=0x2d; break;
         case 0x54: cp[3]=0x2a; break;
         case 0x55: cp[3]=0x2b; break;
+        case 0x5a: cp[3]=0x24; break;
         case 0x5c: cp[3]=0x22; break;
         case 0x5d: cp[3]=0x23; break;
         case 0x5e: cp[3]=0x20; break;
@@ -240,6 +243,8 @@ fix_length_received(unsigned char *received, int *len)
         received[1] = (*len);
         switch( received[1] ) {
           case 0x52: received[3]=0x2c; break;
+          case 0x5a: received[3]=0x24; break;
+          case 0x66: received[3]=0x1a; break;
           case 0x6a: received[3]=0x14; break;
           default:  received[3]=sum-received[1]; break;
         }
@@ -319,6 +324,115 @@ unsigned char conv(char *nn){
 		res = res + (tt * pow(16,1-i));
 		}
 		return res;
+}
+
+int
+check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int cc, unsigned char *last_sent, int *terminated, int *already_read )
+{
+    int bytes_read,i,j;
+    unsigned char buf[1024]; /*read buffer*/
+    unsigned char header[3]; /*read buffer*/
+    struct timeval tv;
+    fd_set readfds;
+
+    tv.tv_sec = 0; // set timeout of reading
+    tv.tv_usec = 5000;
+    memset(buf,0,1024);
+
+    FD_ZERO(&readfds);
+    FD_SET((*s), &readfds);
+				
+    select((*s)+1, &readfds, NULL, NULL, &tv);
+				
+    (*terminated) = 0; // Tag to tell if string has 7e termination
+    // first read the header to get the record length
+    if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
+        bytes_read = recv((*s), header, sizeof(header), 0); //Get length of string
+	(*rr) = 0;
+        for( i=0; i<sizeof(header); i++ ) {
+            received[(*rr)] = header[i];
+	    if (debug == 1) printf("%02x ", received[(*rr)]);
+            (*rr)++;
+        }
+    }
+    else
+    {
+       if( verbose==1) printf("Timeout reading bluetooth socket\n");
+       (*rr) = 0;
+       memset(received,0,1024);
+       return -1;
+    }
+    if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
+        bytes_read = recv((*s), buf, header[1]-3, 0); //Read the length specified by header
+    }
+    else
+    {
+       if( verbose==1) printf("Timeout reading bluetooth socket\n");
+       (*rr) = 0;
+       memset(received,0,1024);
+       return -1;
+    }
+    if ( bytes_read > 0){
+        if (debug == 1) printf("\nReceiving\n");
+	if (debug == 1){ 
+           printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
+           j=12;
+           for( i=0; i<sizeof(header); i++ ) {
+              if( j%16== 0 )
+                 printf( "\n    %08x: ",j);
+              printf("%02x ",header[i]);
+              j++;
+           }
+	   for (i=0;i<bytes_read;i++) {
+              if( j%16== 0 )
+                 printf( "\n    %08x: ",j);
+              printf("%02x ",buf[i]);
+              j++;
+           }
+           printf(" rr=%d",(bytes_read+(*rr)));
+	   printf("\n\n");
+        }
+        if ((cc==bytes_read)&&(memcmp(received,last_sent,cc) == 0)){
+           printf( "ERROR received what we sent!" ); getchar();
+           //Need to do something
+        }
+        if( buf[ bytes_read-1 ] == 0x7e )
+           (*terminated) = 1;
+        else
+           (*terminated) = 0;
+        for (i=0;i<bytes_read;i++){ //start copy the rec buffer in to received
+            if (buf[i] == 0x7d){ //did we receive the escape char
+	        switch (buf[i+1]){   // act depending on the char after the escape char
+					
+		    case 0x5e :
+	                received[(*rr)] = 0x7e;
+		        break;
+							   
+		    case 0x5d :
+		        received[(*rr)] = 0x7d;
+		        break;
+							
+		    default :
+		        received[(*rr)] = buf[i+1] ^ 0x20;
+		        break;
+	        }
+		    i++;
+	    }
+	    else { 
+               received[(*rr)] = buf[i];
+            }
+	    if (debug == 1) printf("%02x ", received[(*rr)]);
+	    (*rr)++;
+	}
+        fix_length_received( received, rr );
+	if (debug == 1) {
+	    printf("\n");
+            for( i=0;i<(*rr); i++ ) printf("%02x ", received[(i)]);
+        }
+	if (debug == 1) printf("\n\n");
+        (*already_read)=1;
+    }	
+    return 0;
 }
 
 int
@@ -428,6 +542,7 @@ read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, int c
     }	
     return 0;
 }
+
 int select_str(char *s)
 {
     int i;
@@ -1267,7 +1382,7 @@ int main(int argc, char **argv)
         int failedbluetooth=0;
         int terminated=0;
 	int s,i,j,status,mysql=0,post=0,repost=0,test=0,file=0,daterange=0;
-        int install=0;
+        int install=0, already_read=0;
         int location=0, error=0;
 	int ret,found,crc_at_end,last, finished=0;
         int togo=0;
@@ -1460,23 +1575,26 @@ int main(int argc, char **argv)
 			if (debug == 1) printf("[%d] Waiting for data on rfcomm\n",linenum);
 			found = 0;
 			do {
-                            rr=0;
-                            if( read_bluetooth( &conf, &s, &rr, received, cc, last_sent, &terminated ) != 0 )
+                            if( already_read == 0 )
+                                rr=0;
+                            if(( already_read == 0 )&&( read_bluetooth( &conf, &s, &rr, received, cc, last_sent, &terminated ) != 0 ))
                             {
-                               fseek( fp, returnpos, 0 );
-                               linenum = returnline;
-                               found=0;
-                               if( archdatalen > 0 )
-                                  free( archdatalist );
-                               archdatalen=0;
-                               strcpy( lineread, "" );
-                               sleep(10);
-                               failedbluetooth++;
-                               if( failedbluetooth > 3 )
-                                 exit(-1);
-                               goto start;
+                                already_read=0;
+                                fseek( fp, returnpos, 0 );
+                                linenum = returnline;
+                                found=0;
+                                if( archdatalen > 0 )
+                                   free( archdatalist );
+                                archdatalen=0;
+                                strcpy( lineread, "" );
+                                sleep(10);
+                                failedbluetooth++;
+                                if( failedbluetooth > 3 )
+                                    exit(-1);
+                                goto start;
                             }
                             else {
+                              already_read=0;
 			      if (debug == 1){ 
                                 printf( "  [%d] looking for: ",linenum);
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
@@ -1590,7 +1708,13 @@ int main(int argc, char **argv)
 				case 13: // $TIMEFROM1	
 				// get report time and convert
                                 if( daterange == 1 ) {
-                                    strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm);
+                                    if( strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm) == 0 ) 
+                                    {
+                                        if( debug==1 ) printf( "datefrom %s\n", datefrom );
+                                        printf( "Time Coversion Error\n" );
+                                        error=1;
+                                        exit(-1);
+                                    }
                                     fromtime=mktime(&tm);
                                     if( fromtime == -1 ) {
                                     // Error we need to do something about it
@@ -1694,12 +1818,14 @@ int main(int argc, char **argv)
 				
 				case 19: // $PASSWORD
                               
+                                j=0;
 				for(i=0;i<12;i++){
-				    if( conf.Password[i] == '\0' )
+				    if( conf.Password[j] == '\0' )
                                   	fl[cc] = 0x88;
                                     else {
-                                        pass_i = conf.Password[i];
+                                        pass_i = conf.Password[j];
                                         fl[cc] = (( pass_i+0x88 )%0xff);
+                                        j++;
                                     }
                                     cc++;
 				}
@@ -1739,6 +1865,9 @@ int main(int argc, char **argv)
                         last_sent = (unsigned  char *)realloc( last_sent, sizeof( unsigned char )*(cc));
 			memcpy(last_sent,fl,cc);
 			write(s,fl,cc);
+                        already_read=0;
+                        check_send_error( &conf, &s, &rr, received, cc, last_sent, &terminated, &already_read ); 
+                        printf( "already_read=%d\n", already_read );
 		}
 
 
@@ -1781,7 +1910,8 @@ int main(int argc, char **argv)
 				//printf("Current power = %i Watt\n",currentpower);
 				break;
 				case 5: // extract current power
-				idate = (received[66] * 16777216 ) + (received[65] *65536 )+ (received[64] * 256) + received[63];
+                                data = ReadStream( &conf, &s, received, &rr, data, &datalen, last_sent, cc, &terminated, &togo );
+                                idate=ConvertStreamtoTime( data+4, 4, &idate );
                                 loctime = localtime(&idate);
                                 day = loctime->tm_mday;
                                 month = loctime->tm_mon +1;
@@ -1789,8 +1919,9 @@ int main(int argc, char **argv)
                                 hour = loctime->tm_hour;
                                 minute = loctime->tm_min; 
                                 second = loctime->tm_sec; 
-				currentpower = (received[69] * 65536) + (received[68] * 256) + received[67];
+                                ConvertStreamtoFloat( data+8, 4, &currentpower );
 				printf("%d-%02d-%02d %02d:%02d:%02d Current power = %.0f Watt\n", year, month, day, hour, minute, second, currentpower);
+                                free( data );
 				break;
 
 				case 6: // extract total energy collected today
@@ -1820,30 +1951,10 @@ int main(int argc, char **argv)
 				break;
 
 				case 17: // Test data
-                                i=19;
-                                printf( "\n" );
-                                for( j=0; j<8; j++ ) {
-				    idate = (received[i+3] * 16777216 ) + (received[i+2] *65536 )+ (received[i+1] * 256) + received[i];
-                                    loctime = localtime(&idate);
-                                    day = loctime->tm_mday;
-                                    month = loctime->tm_mon +1;
-                                    year = loctime->tm_year + 1900;
-                                    hour = loctime->tm_hour;
-                                    minute = loctime->tm_min; 
-                                    second = loctime->tm_sec; 
-				    gtotal = (received[i+6] * 65536) + (received[i+5] * 256) + received[i+4];
-				    gtotal = gtotal / 1000;
-	                            if (verbose == 1) printf("%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh", day, month, year, hour, minute,second, gtotal);
-                                    i+=12;
-                                    printf( "\n" );
-                                }
+                                data = ReadStream( &conf, &s, received, &rr, data, &datalen, last_sent, cc, &terminated, &togo );
                                 printf( "\n" );
                           
-				gtotal = (received[69] * 65536) + (received[68] * 256) + received[67];
-				gtotal = gtotal / 1000;
-            printf("G total so far = %.2f Kwh\n",gtotal);
-				dtotal = (received[84] * 256) + received[83];
-				dtotal = dtotal / 1000;
+                                free( data );
 				break;
 				
 				case 18: // $ARCHIVEDATA1
@@ -1966,6 +2077,7 @@ int main(int argc, char **argv)
         mysql_close(conn);
     }
 
+    curtime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
     loctime = localtime(&curtime);
     day = loctime->tm_mday;
     month = loctime->tm_mon +1;
