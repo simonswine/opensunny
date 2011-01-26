@@ -61,7 +61,17 @@ typedef struct{
     char PVOutputURL[80];       /*--pvouturl    -url 	*/
     char PVOutputKey[80];       /*--pvoutkey    -key 	*/
     char PVOutputSid[20];       /*--pvoutsid    -sid 	*/
+    unsigned char InverterCode[4]; /*Unknown code inverter specific*/
+    unsigned int ArchiveCode;    /* Code for archive data */
 } ConfType;
+
+typedef struct{
+    unsigned int 	key1;
+    unsigned int 	key2;
+    char		description[20];
+    char		units[20];
+    float		divisor;
+} ReturnType;
 
 char *accepted_strings[] = {
 "$END",
@@ -86,12 +96,13 @@ char *accepted_strings[] = {
 "$PASSWORD",
 "$SIGNAL",
 "$UNKNOWN",
-"$INVCODE"
+"$INVCODE",
+"$ARCHCODE",
+"$INVERTERDATA"
 };
 
 int cc,debug = 0,verbose=0;
 unsigned char fl[1024] = { 0 };
-
 
 
 static u16 fcstab[256] = {
@@ -213,6 +224,7 @@ fix_length_send(unsigned char *cp, int *len)
         case 0x54: cp[3]=0x2a; break;
         case 0x55: cp[3]=0x2b; break;
         case 0x5a: cp[3]=0x24; break;
+        case 0x5b: cp[3]=0x23; break;
         case 0x5c: cp[3]=0x22; break;
         case 0x5d: cp[3]=0x23; break;
         case 0x5e: cp[3]=0x20; break;
@@ -460,7 +472,7 @@ read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, int c
 	(*rr) = 0;
         for( i=0; i<sizeof(header); i++ ) {
             received[(*rr)] = header[i];
-	    if (debug == 1) printf("%02x ", received[(*rr)]);
+	    if (debug == 1) printf("%02x ", received[i]);
             (*rr)++;
         }
     }
@@ -920,19 +932,21 @@ int is_light( ConfType * conf )
 }
 
 //Set a value depending on inverter
-int  SetInverterType( ConfType * conf, unsigned char * InverterCode )  
+int  SetInverterType( ConfType * conf )  
 {
     if( strcmp(conf->Inverter, "3000TL") == 0 ) {
-        InverterCode[0] = 0x12;
-        InverterCode[1] = 0x1a;
-        InverterCode[2] = 0xd9;
-        InverterCode[3] = 0x38;
+        conf->InverterCode[0] = 0x12;
+        conf->InverterCode[1] = 0x1a;
+        conf->InverterCode[2] = 0xd9;
+        conf->InverterCode[3] = 0x38;
+        conf->ArchiveCode    = 0x71;
     }
     if( strcmp(conf->Inverter, "5000TL") == 0 ) {
-        InverterCode[0] = 0x3f;
-        InverterCode[1] = 0x10;
-        InverterCode[2] = 0xfb;
-        InverterCode[3] = 0x39;
+        conf->InverterCode[0] = 0x3f;
+        conf->InverterCode[1] = 0x10;
+        conf->InverterCode[2] = 0xfb;
+        conf->InverterCode[3] = 0x39;
+        conf->ArchiveCode     = 0x4e;
     }
 }
 //Convert a recieved string to a value
@@ -971,6 +985,74 @@ float ConvertStreamtoFloat( unsigned char * stream, int length, float * value )
    if( nullvalue == 1 )
       (*value) = 0; //Asigning null to 0 at this stage unless it breaks something
    return (*value);
+}
+
+//read return value data from init file
+ReturnType * 
+InitReturnKeys( ConfType * conf, ReturnType * returnkeylist, int * num_return_keys )
+{
+   FILE		*fp;
+   char		line[400];
+   char		buffer[80];
+   ReturnType   tmp;
+   int		i, j, reading, data_follows;
+
+   data_follows = 0;
+
+   fp=fopen(conf->File,"r");
+
+   while (!feof(fp)){	
+	if (fgets(line,400,fp) != NULL){				//read line from smatool.conf
+            if( line[0] != '#' ) 
+            {
+                if( strncmp( line, ":unit conversions", 17 ) == 0 )
+                    data_follows = 1;
+                if( strncmp( line, ":end unit conversions", 21 ) == 0 )
+                    data_follows = 0;
+                if( data_follows == 1 ) {
+                    tmp.key1=0x0;
+                    tmp.key2=0x0;
+                    strcpy( tmp.description, "" ); //Null out value
+                    strcpy( tmp.units, "" ); //Null out value
+                    tmp.divisor=0;
+                    reading=0;
+                    if( sscanf( line, "%x %x", &tmp.key1, &tmp.key2  ) == 2 ) {
+                        j=0;
+                        for( i=6; line[i]!='\0'; i++ ) {
+                            if(( line[i] == '"' )&&(reading==1)) {
+                                tmp.description[j]='\0';
+                                break;
+                            }
+                            if( reading == 1 )
+                            {
+                                tmp.description[j] = line[i];
+                                j++;
+                            }
+                             
+                            if(( line[i] == '"' )&&(reading==0))
+                                reading = 1;
+                        }
+                        if( sscanf( line+i+1, "%s %f", tmp.units, &tmp.divisor ) == 2 ) {
+                              
+                            if( (*num_return_keys) == 0 )
+                                returnkeylist=(ReturnType *)malloc(sizeof(ReturnType));
+                            else
+                                returnkeylist=(ReturnType *)realloc(returnkeylist,sizeof(ReturnType)*((*num_return_keys)+1));
+                            (returnkeylist+(*num_return_keys))->key1=tmp.key1;
+                            (returnkeylist+(*num_return_keys))->key2=tmp.key2;
+                            strcpy( (returnkeylist+(*num_return_keys))->description, tmp.description );
+                            strcpy( (returnkeylist+(*num_return_keys))->units, tmp.units );
+                            (returnkeylist+(*num_return_keys))->divisor = tmp.divisor;
+                            (*num_return_keys)++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fclose(fp);
+   
+    return returnkeylist;
 }
 
 //Convert a recieved string to a value
@@ -1373,10 +1455,14 @@ int main(int argc, char **argv)
 	FILE *fp;
         unsigned char * last_sent;
         ConfType conf;
+        ReturnType *returnkeylist;
+        int num_return_keys=0;
 	struct sockaddr_rc addr = { 0 };
 	unsigned char received[1024];
 	unsigned char datarecord[1024];
 	unsigned char * data;
+        int return_key;
+        int gap=1;
         int datalen = 0;
         int archdatalen=0;
         int failedbluetooth=0;
@@ -1399,7 +1485,6 @@ int main(int argc, char **argv)
 	unsigned char address2[6] = { 0 };
 	unsigned char timestr[25] = { 0 };
 	unsigned char serial[4] = { 0 };
-	unsigned char unknown[4] = { 0 };
         int  invcode;
 	char *lineread;
 	time_t curtime;
@@ -1416,7 +1501,10 @@ int main(int argc, char **argv)
 	char pac[2];
 	char tot[2];
 	char chan[1];
-	float currentpower;
+	float currentpower_total;
+	float currentpower_string1;
+	float currentpower_string2;
+	float currentpower_string3;
         int   rr;
 	int linenum = 0;
 	float dtotal;
@@ -1464,7 +1552,9 @@ int main(int argc, char **argv)
         exit(0);
     }
     // Set value for inverter type
-    SetInverterType( &conf, unknown );
+    SetInverterType( &conf );
+    // Get Return Value lookup from file
+    returnkeylist = InitReturnKeys( &conf, returnkeylist, &num_return_keys );
     // Location based information to avoid quering Inverter in the dark
     if((location==1)&&(mysql==1)) {
        if( ! todays_almanac( &conf ) ) {
@@ -1604,7 +1694,7 @@ int main(int argc, char **argv)
 			        printf("\n\n");
 			      }
                            
-			      if (memcmp(fl,received,cc) == 0){
+			      if (memcmp(fl+4,received+4,cc-4) == 0){
 				  found = 1;
 				  if (debug == 1) printf("[%d] Found string we are waiting for\n",linenum); 
 			      } else {
@@ -1833,13 +1923,17 @@ int main(int argc, char **argv)
 
 				case 21: // $UNKNOWN
 				for (i=0;i<4;i++){
-			            fl[cc] = unknown[i];
+			            fl[cc] = conf.InverterCode[i];
 				    cc++;
 				}
                                 break;
 
 				case 22: // $INVCODE
 			            fl[cc] = invcode;
+				    cc++;
+                                break;
+				case 23: // $ARCHCODE
+			            fl[cc] = conf.ArchiveCode;
 				    cc++;
                                 break;
 
@@ -1867,7 +1961,6 @@ int main(int argc, char **argv)
 			write(s,fl,cc);
                         already_read=0;
                         check_send_error( &conf, &s, &rr, received, cc, last_sent, &terminated, &already_read ); 
-                        printf( "already_read=%d\n", already_read );
 		}
 
 
@@ -1909,18 +2002,40 @@ int main(int argc, char **argv)
 				//currentpower = (received[72] * 256) + received[71];
 				//printf("Current power = %i Watt\n",currentpower);
 				break;
-				case 5: // extract current power
+				case 5: // extract current power $POW
                                 data = ReadStream( &conf, &s, received, &rr, data, &datalen, last_sent, cc, &terminated, &togo );
-                                idate=ConvertStreamtoTime( data+4, 4, &idate );
-                                loctime = localtime(&idate);
-                                day = loctime->tm_mday;
-                                month = loctime->tm_mon +1;
-                                year = loctime->tm_year + 1900;
-                                hour = loctime->tm_hour;
-                                minute = loctime->tm_min; 
-                                second = loctime->tm_sec; 
-                                ConvertStreamtoFloat( data+8, 4, &currentpower );
-				printf("%d-%02d-%02d %02d:%02d:%02d Current power = %.0f Watt\n", year, month, day, hour, minute, second, currentpower);
+                                if( (data+3)[0] == 0x08 )
+                                    gap = 40; 
+                                if( (data+3)[0] == 0x10 )
+                                    gap = 40; 
+                                if( (data+3)[0] == 0x40 )
+                                    gap = 28;
+                                if( (data+3)[0] == 0x00 )
+                                    gap = 28;
+                                for ( i = 0; i<datalen; i+=gap ) 
+                                {
+                                   idate=ConvertStreamtoTime( data+i+4, 4, &idate );
+                                   loctime = localtime(&idate);
+                                   day = loctime->tm_mday;
+                                   month = loctime->tm_mon +1;
+                                   year = loctime->tm_year + 1900;
+                                   hour = loctime->tm_hour;
+                                   minute = loctime->tm_min; 
+                                   second = loctime->tm_sec; 
+                                   ConvertStreamtoFloat( data+i+8, 3, &currentpower_total );
+                                   return_key=-1;
+                                   for( j=0; j<num_return_keys; j++ )
+                                   {
+                                      if(( (data+i+1)[0] == returnkeylist[j].key1 )&&((data+i+2)[0] == returnkeylist[j].key2)) {
+                                          return_key=j;
+                                          break;
+                                      }
+                                   }
+                                   if( return_key >= 0 )
+				       printf("%d-%02d-%02d %02d:%02d:%02d %-20s = %.0f %-20s\n", year, month, day, hour, minute, second, returnkeylist[return_key].description, currentpower_total/returnkeylist[return_key].divisor, returnkeylist[return_key].units );
+                                   else
+				       printf("%d-%02d-%02d %02d:%02d:%02d NO DATA for %02x %02x = %.0f NO UNITS\n", year, month, day, hour, minute, second, (data+i+1)[0], (data+i+1)[1], currentpower_total );
+                                }
                                 free( data );
 				break;
 
@@ -1987,7 +2102,7 @@ int main(int argc, char **argv)
                                          ConvertStreamtoFloat( datarecord+4, 8, &gtotal );
                                          if(archdatalen == 0 )
                                             ptotal = gtotal;
-	                                 if (verbose == 1) printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts togo=%d i=%d crc=%d", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12, togo, i, crc_at_end);
+	                                    printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts togo=%d i=%d crc=%d", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12, togo, i, crc_at_end);
                                          if( idate != prev_idate+300 ) {
                                             printf( "Date Error! prev=%d current=%d\n", (int)prev_idate, (int)idate );
                                             error=1;
@@ -2041,6 +2156,46 @@ int main(int argc, char **argv)
 				invcode=received[22];
 				if (debug == 1) printf("extracting invcode=%02x\n", invcode);
                                 
+				break;
+				case 24: // Inverter data $INVERTERDATA
+                                data = ReadStream( &conf, &s, received, &rr, data, &datalen, last_sent, cc, &terminated, &togo );
+                                if( debug==1 ) printf( "data=%02x\n",(data+3)[0] );
+                                if( (data+3)[0] == 0x08 )
+                                    gap = 40; 
+                                if( (data+3)[0] == 0x10 )
+                                    gap = 40; 
+                                if( (data+3)[0] == 0x40 )
+                                    gap = 28;
+                                if( (data+3)[0] == 0x00 )
+                                    gap = 28;
+                                for ( i = 0; i<datalen; i+=gap ) 
+                                {
+                                   idate=ConvertStreamtoTime( data+i+4, 4, &idate );
+                                   loctime = localtime(&idate);
+                                   day = loctime->tm_mday;
+                                   month = loctime->tm_mon +1;
+                                   year = loctime->tm_year + 1900;
+                                   hour = loctime->tm_hour;
+                                   minute = loctime->tm_min; 
+                                   second = loctime->tm_sec; 
+                                   ConvertStreamtoFloat( data+i+8, 3, &currentpower_total );
+                                   return_key=-1;
+                                   for( j=0; j<num_return_keys; j++ )
+                                   {
+                                      if(( (data+i+1)[0] == returnkeylist[j].key1 )&&((data+i+2)[0] == returnkeylist[j].key2)) {
+                                          return_key=j;
+                                          break;
+                                      }
+                                   }
+                                   if( return_key >= 0 ) {
+                                       if( i==0 )
+				           printf("%d-%02d-%02d %s\n", year, month, day, hour, minute, second, (data+i+8) );
+				       printf("%d-%02d-%02d %02d:%02d:%02d %-20s = %.0f %-20s\n", year, month, day, hour, minute, second, returnkeylist[return_key].description, currentpower_total/returnkeylist[return_key].divisor, returnkeylist[return_key].units );
+                                   }
+                                   else
+				       printf("%d-%02d-%02d %02d:%02d:%02d NO DATA for %02x %02x = %.0f NO UNITS \n", year, month, day, hour, minute, second, (data+i+1)[0], (data+i+1)[0], currentpower_total );
+                                }
+                                free( data );
 				break;
 				}				
                             }
@@ -2150,7 +2305,9 @@ int main(int argc, char **argv)
     }
 
   close(s);
-  free(archdatalist);
+  if( archdatalen > 0 )
+      free( archdatalist );
+  archdatalen=0;
   free(last_sent);
 }
 
