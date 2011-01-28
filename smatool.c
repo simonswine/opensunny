@@ -98,7 +98,10 @@ char *accepted_strings[] = {
 "$UNKNOWN",
 "$INVCODE",
 "$ARCHCODE",
-"$INVERTERDATA"
+"$INVERTERDATA",
+"$CNT",        /*Counter of sent packets*/
+"$TIMEZONE",    /*Timezone seconds +1 from GMT*/
+"$TIMESET"    /*Unknown string involved in time setting*/
 };
 
 int cc,debug = 0,verbose=0;
@@ -564,6 +567,50 @@ int select_str(char *s)
        if (!strcmp(s, accepted_strings[i])) return i;
     }
     return -1;
+}
+
+unsigned char *  get_timezone_in_seconds( unsigned char *tzhex )
+{
+   time_t curtime;
+   struct tm *loctime;
+   struct tm *utctime;
+   int day,month,year,hour,minute,second,isdst,datapoint;
+   char *returntime;
+
+   float localOffset;
+   int	 tzsecs, tzsecsword;
+
+   returntime = (char *)malloc(6*sizeof(char));
+   curtime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
+   loctime = localtime(&curtime);
+   day = loctime->tm_mday;
+   month = loctime->tm_mon +1;
+   year = loctime->tm_year + 1900;
+   hour = loctime->tm_hour;
+   minute = loctime->tm_min; 
+   isdst  = loctime->tm_isdst;
+   utctime = gmtime(&curtime);
+   
+
+   if( debug == 1 ) printf( "utc=%04d-%02d-%02d %02d:%02d local=%04d-%02d-%02d %02d:%02d diff %d hours\n", utctime->tm_year+1900, utctime->tm_mon+1,utctime->tm_mday,utctime->tm_hour,utctime->tm_min, year, month, day, hour, minute, hour-utctime->tm_hour );
+   localOffset=(hour-utctime->tm_hour)+(minute-utctime->tm_min)/60;
+   if( debug == 1 ) printf( "localOffset=%f\n", localOffset );
+   if(( year > utctime->tm_year+1900 )||( month > utctime->tm_mon+1 )||( day > utctime->tm_mday ))
+      localOffset+=24;
+   if(( year < utctime->tm_year+1900 )||( month < utctime->tm_mon+1 )||( day < utctime->tm_mday ))
+      localOffset-=24;
+   if( debug == 1 ) printf( "localOffset=%f isdst=%d\n", localOffset, isdst );
+   if( isdst > 0 )
+       localOffset=localOffset-1;
+   tzsecs = (localOffset) * 3600 + 1;
+   if( tzsecs < 0 )
+       tzsecs=65536+tzsecs;
+   if( debug == 1 ) printf( "tzsecs=%x %d\n", tzsecs, tzsecs );
+   tzhex[1] = tzsecs/256;
+   tzhex[0] = tzsecs -(tzsecs/256)*256;
+   if( debug == 1 ) printf( "tzsecs=%02x %02x\n", tzhex[1], tzhex[0] );
+
+   return tzhex;
 }
 
 char *  sunrise( float latitude, float longitude )
@@ -1461,6 +1508,7 @@ int main(int argc, char **argv)
 	unsigned char received[1024];
 	unsigned char datarecord[1024];
 	unsigned char * data;
+	unsigned char send_count = 0x0;
         int return_key;
         int gap=1;
         int datalen = 0;
@@ -1485,6 +1533,8 @@ int main(int argc, char **argv)
 	unsigned char address2[6] = { 0 };
 	unsigned char timestr[25] = { 0 };
 	unsigned char serial[4] = { 0 };
+	unsigned char tzhex[2] = { 0 };
+	unsigned char timeset[4] = { 0x30,0xfe,0x7e,0x00 };
         int  invcode;
 	char *lineread;
 	time_t curtime;
@@ -1555,6 +1605,8 @@ int main(int argc, char **argv)
     SetInverterType( &conf );
     // Get Return Value lookup from file
     returnkeylist = InitReturnKeys( &conf, returnkeylist, &num_return_keys );
+    // Get Local Timezone offset in seconds
+    get_timezone_in_seconds( tzhex );
     // Location based information to avoid quering Inverter in the dark
     if((location==1)&&(mysql==1)) {
        if( ! todays_almanac( &conf ) ) {
@@ -1936,6 +1988,22 @@ int main(int argc, char **argv)
 			            fl[cc] = conf.ArchiveCode;
 				    cc++;
                                 break;
+				case 25: // $CNT send counter
+                                    send_count++;
+			            fl[cc] = send_count;
+				    cc++;
+                                break;
+				case 26: // $TIMEZONE timezone in seconds
+			            fl[cc] = tzhex[1];
+			            fl[cc+1] = tzhex[0];
+				    cc+=2;
+                                break;
+				case 27: // $TIMESET unknown setting
+                                    for( i=0; i<4; i++ ) {
+			                fl[cc] = timeset[i];
+				        cc++;
+                                    }
+                                break;
 
 				default :
 				fl[cc] = conv(lineread);
@@ -2060,8 +2128,19 @@ int main(int argc, char **argv)
 				break;
 
 				case 12: // extract time strings $TIMESTRING
-				memcpy(timestr,received+63,24);
-				if (debug == 1) printf("extracting timestring\n");
+                                if(( received[60] == 0x6d )&&( received[61] == 0x23 ))
+                                {
+				    memcpy(timestr,received+63,24);
+				    if (debug == 1) printf("extracting timestring\n");
+                                    memcpy(timeset,received+79,4);
+                                }
+                                else
+                                {
+				    memcpy(timestr,received+63,24);
+				    if (debug == 1) printf("extracting timestring\n");
+                                    error=1;
+                                    //exit(-1);
+                                }
                                 
 				break;
 
