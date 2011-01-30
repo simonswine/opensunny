@@ -1640,6 +1640,7 @@ int main(int argc, char **argv)
    str2ba( conf.BTAddress, &addr.rc_bdaddr );
 
    // connect to server
+   if( debug==1 ) { printf( "datefrom=%s dateto=%s\n", datefrom, dateto ); }
    for( i=1; i<5; i++ ){
       status = connect(s, (struct sockaddr *)&addr, sizeof(addr));
 	if (status <0){
@@ -1850,13 +1851,14 @@ int main(int argc, char **argv)
 				case 13: // $TIMEFROM1	
 				// get report time and convert
                                 if( daterange == 1 ) {
-                                    if( strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm) == 0 ) 
+                                    if( strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm) == (time_t)NULL ) 
                                     {
                                         if( debug==1 ) printf( "datefrom %s\n", datefrom );
                                         printf( "Time Coversion Error\n" );
                                         error=1;
                                         exit(-1);
                                     }
+                                    tm.tm_isdst=-1;
                                     fromtime=mktime(&tm);
                                     if( fromtime == -1 ) {
                                     // Error we need to do something about it
@@ -1883,14 +1885,21 @@ int main(int argc, char **argv)
 
 				case 14: // $TIMETO1	
                                 if( daterange == 1 ) {
-                                    strptime( dateto, "%Y-%m-%d %H:%M:%S", &tm);
+                                    if( strptime( dateto, "%Y-%m-%d %H:%M:%S", &tm) == 0 ) 
+                                    {
+                                        if( debug==1 ) printf( "dateto %s\n", dateto );
+                                        printf( "Time Coversion Error\n" );
+                                        error=1;
+                                        exit(-1);
+                                    }
+                                    tm.tm_isdst=-1;
                                     totime=mktime(&tm);
                                     if( totime == -1 ) {
                                     // Error we need to do something about it
                                         printf( "%03x",(int)totime ); getchar();
                                         printf( "\n%03x", totime ); getchar();
-                                        fromtime=0;
-                                        printf( "bad from" ); getchar();
+                                        totime=0;
+                                        printf( "bad to" ); getchar();
                                     }
                                 }
                                 else
@@ -1909,6 +1918,7 @@ int main(int argc, char **argv)
 				case 15: // $TIMEFROM2	
                                 if( daterange == 1 ) {
                                     strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm);
+                                    tm.tm_isdst=-1;
                                     fromtime=mktime(&tm)-86400;
                                     if( fromtime == -1 ) {
                                     // Error we need to do something about it
@@ -1937,6 +1947,7 @@ int main(int argc, char **argv)
                                 if( daterange == 1 ) {
                                     strptime( dateto, "%Y-%m-%d %H:%M:%S", &tm);
 
+                                    tm.tm_isdst=-1;
                                     totime=mktime(&tm)-86400;
                                     if( totime == -1 ) {
                                     // Error we need to do something about it
