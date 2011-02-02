@@ -214,18 +214,27 @@ fix_length_send(unsigned char *cp, int *len)
       if( debug == 1 ) {
           printf( "  length change from %x to %x \n", cp[1],(*len)+1 );
       }
+      cp[3] = (cp[1]+cp[3])-(*len)+1;
       cp[1] =(*len)+1;
+/*
       switch( cp[1] ) {
         case 0x3a: cp[3]=0x44; break;
+        case 0x3b: cp[3]=0x43; break;
+        case 0x3c: cp[3]=0x42; break;
+        case 0x3d: cp[3]=0x41; break;
         case 0x3e: cp[3]=0x40; break;
         case 0x3f: cp[3]=0x41; break;
         case 0x40: cp[3]=0x3e; break;
         case 0x41: cp[3]=0x3f; break;
         case 0x42: cp[3]=0x3c; break;
         case 0x52: cp[3]=0x2c; break;
-        case 0x53: cp[3]=0x2d; break;
+        case 0x53: cp[3]=0x2b; break;
         case 0x54: cp[3]=0x2a; break;
-        case 0x55: cp[3]=0x2b; break;
+        case 0x55: cp[3]=0x29; break;
+        case 0x56: cp[3]=0x28; break;
+        case 0x57: cp[3]=0x27; break;
+        case 0x58: cp[3]=0x26; break;
+        case 0x59: cp[3]=0x25; break;
         case 0x5a: cp[3]=0x24; break;
         case 0x5b: cp[3]=0x23; break;
         case 0x5c: cp[3]=0x22; break;
@@ -237,6 +246,7 @@ fix_length_send(unsigned char *cp, int *len)
         case 0x62: cp[3]=0x1e; break;
         default: printf( "NO CONVERSION!" );getchar();break;
       }
+*/
     }
 }
             
@@ -600,7 +610,7 @@ unsigned char *  get_timezone_in_seconds( unsigned char *tzhex )
    if(( year < utctime->tm_year+1900 )||( month < utctime->tm_mon+1 )||( day < utctime->tm_mday ))
       localOffset-=24;
    if( debug == 1 ) printf( "localOffset=%f isdst=%d\n", localOffset, isdst );
-   if( isdst > 0 )
+   if( isdst > 0 ) 
        localOffset=localOffset-1;
    tzsecs = (localOffset) * 3600 + 1;
    if( tzsecs < 0 )
@@ -987,6 +997,13 @@ int  SetInverterType( ConfType * conf )
         conf->InverterCode[2] = 0xd9;
         conf->InverterCode[3] = 0x38;
         conf->ArchiveCode    = 0x71;
+    }
+    if( strcmp(conf->Inverter, "4000TL") == 0 ) {
+        conf->InverterCode[0] = 0x78;
+        conf->InverterCode[1] = 0x21;
+        conf->InverterCode[2] = 0xbf;
+        conf->InverterCode[3] = 0x3a;
+        conf->ArchiveCode    = 0x4e;
     }
     if( strcmp(conf->Inverter, "5000TL") == 0 ) {
         conf->InverterCode[0] = 0x3f;
@@ -2144,6 +2161,10 @@ int main(int argc, char **argv)
 				    memcpy(timestr,received+63,24);
 				    if (debug == 1) printf("extracting timestring\n");
                                     memcpy(timeset,received+79,4);
+                                    idate=ConvertStreamtoTime( received+63,4, &idate );
+                                    /* Allow delay for inverter to be slow */
+                                    if( reporttime > idate )
+                                       sleep( reporttime - idate );
                                 }
                                 else
                                 {
