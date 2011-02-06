@@ -212,11 +212,11 @@ fix_length_send(unsigned char *cp, int *len)
     {
       delta = (*len)+1 - cp[1];
       if( debug == 1 ) {
-          printf( "  length change from %x to %x \n", cp[1],(*len)+1 );
+          printf( "  length change from %x to %x diff=%x \n", cp[1],(*len)+1,cp[1]+cp[3] );
       }
-      cp[3] = (cp[1]+cp[3])-(*len)+1;
+      cp[3] = (cp[1]+cp[3])-(*len)-1;
       cp[1] =(*len)+1;
-/*
+
       switch( cp[1] ) {
         case 0x3a: cp[3]=0x44; break;
         case 0x3b: cp[3]=0x43; break;
@@ -246,7 +246,8 @@ fix_length_send(unsigned char *cp, int *len)
         case 0x62: cp[3]=0x1e; break;
         default: printf( "NO CONVERSION!" );getchar();break;
       }
-*/
+      if( debug == 1 ) 
+         printf( "new sum=%x\n", cp[1]+cp[3] );
     }
 }
             
@@ -1294,34 +1295,37 @@ int GetConfig( ConfType *conf )
                 strcpy( value, "" ); //Null out value
                 sscanf( line, "%s %s", variable, value );
                 if( debug == 1 ) printf( "variable=%s value=%s\n", variable, value );
-                if( strcmp( variable, "Inverter" ) == 0 )
-                   strcpy( conf->Inverter, value );  
-                if( strcmp( variable, "BTAddress" ) == 0 )
-                   strcpy( conf->BTAddress, value );  
-                if( strcmp( variable, "BTTimeout" ) == 0 )
-                   conf->bt_timeout =  atoi(value);  
-                if( strcmp( variable, "Password" ) == 0 )
-                   strcpy( conf->Password, value );  
-                if( strcmp( variable, "File" ) == 0 )
-                   strcpy( conf->File, value );  
-                if( strcmp( variable, "Latitude" ) == 0 )
-                   conf->latitude_f = atof(value) ;  
-                if( strcmp( variable, "Longitude" ) == 0 )
-                   conf->longitude_f = atof(value) ;  
-                if( strcmp( variable, "MySqlHost" ) == 0 )
-                   strcpy( conf->MySqlHost, value );  
-                if( strcmp( variable, "MySqlDatabase" ) == 0 )
-                   strcpy( conf->MySqlDatabase, value );  
-                if( strcmp( variable, "MySqlUser" ) == 0 )
-                   strcpy( conf->MySqlUser, value );  
-                if( strcmp( variable, "MySqlPwd" ) == 0 )
-                   strcpy( conf->MySqlPwd, value );  
-                if( strcmp( variable, "PVOutputURL" ) == 0 )
-                   strcpy( conf->PVOutputURL, value );  
-                if( strcmp( variable, "PVOutputKey" ) == 0 )
-                   strcpy( conf->PVOutputKey, value );  
-                if( strcmp( variable, "PVOutputSid" ) == 0 )
-                   strcpy( conf->PVOutputSid, value );  
+                if( value[0] != '\0' )
+                {
+                    if( strcmp( variable, "Inverter" ) == 0 )
+                       strcpy( conf->Inverter, value );  
+                    if( strcmp( variable, "BTAddress" ) == 0 )
+                       strcpy( conf->BTAddress, value );  
+                    if( strcmp( variable, "BTTimeout" ) == 0 )
+                       conf->bt_timeout =  atoi(value);  
+                    if( strcmp( variable, "Password" ) == 0 )
+                       strcpy( conf->Password, value );  
+                    if( strcmp( variable, "File" ) == 0 )
+                       strcpy( conf->File, value );  
+                    if( strcmp( variable, "Latitude" ) == 0 )
+                       conf->latitude_f = atof(value) ;  
+                    if( strcmp( variable, "Longitude" ) == 0 )
+                       conf->longitude_f = atof(value) ;  
+                    if( strcmp( variable, "MySqlHost" ) == 0 )
+                       strcpy( conf->MySqlHost, value );  
+                    if( strcmp( variable, "MySqlDatabase" ) == 0 )
+                       strcpy( conf->MySqlDatabase, value );  
+                    if( strcmp( variable, "MySqlUser" ) == 0 )
+                       strcpy( conf->MySqlUser, value );  
+                    if( strcmp( variable, "MySqlPwd" ) == 0 )
+                       strcpy( conf->MySqlPwd, value );  
+                    if( strcmp( variable, "PVOutputURL" ) == 0 )
+                       strcpy( conf->PVOutputURL, value );  
+                    if( strcmp( variable, "PVOutputKey" ) == 0 )
+                       strcpy( conf->PVOutputKey, value );  
+                    if( strcmp( variable, "PVOutputSid" ) == 0 )
+                       strcpy( conf->PVOutputSid, value );  
+                }
             }
         }
     }
@@ -2163,14 +2167,28 @@ int main(int argc, char **argv)
                                     memcpy(timeset,received+79,4);
                                     idate=ConvertStreamtoTime( received+63,4, &idate );
                                     /* Allow delay for inverter to be slow */
-                                    if( reporttime > idate )
+                                    if( reporttime > idate ) {
+                                       if( debug == 1 )
+                                           printf( "delay=%d\n", reporttime-idate );
                                        sleep( reporttime - idate );
+                                    }
                                 }
                                 else
                                 {
 				    memcpy(timestr,received+63,24);
-				    if (debug == 1) printf("extracting timestring\n");
-                                    error=1;
+				    if (debug == 1) printf("bad extracting timestring\n");
+                                    already_read=0;
+                                    fseek( fp, returnpos, 0 );
+                                    linenum = returnline;
+                                    found=0;
+                                    if( archdatalen > 0 )
+                                       free( archdatalist );
+                                    archdatalen=0;
+                                    strcpy( lineread, "" );
+                                    //failedbluetooth++;
+                                    if( failedbluetooth > 3 )
+                                        exit(-1);
+                                    goto start;
                                     //exit(-1);
                                 }
                                 
