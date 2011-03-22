@@ -5,7 +5,7 @@
 #
 # Not all fields are compulsory
 #
-# Inverter (compulsory) type 3000TL, 4000TL, 5000TL, 10000TL  others not tested
+# Inverter (compulsory) type 1700TL, 3000TL, 4000TL, 5000TL, 10000TL  others not tested
 Inverter	3000TL
 # Inverter (compulsory bluetooth address) use "hcitool scan" to find
 BTAddress
