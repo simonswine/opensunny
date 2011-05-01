@@ -1037,12 +1037,26 @@ void  SetInverterType( ConfType * conf )
         conf->InverterCode[3] = 0x38;
         conf->ArchiveCode    = 0x63;
     }
+    if( strcmp(conf->Inverter, "2100TL") == 0 ) {
+        conf->InverterCode[0] = 0x17;
+        conf->InverterCode[1] = 0x97;
+        conf->InverterCode[2] = 0x51;
+        conf->InverterCode[3] = 0x38;
+        conf->ArchiveCode    = 0x63;
+    }
     if( strcmp(conf->Inverter, "3000TL") == 0 ) {
         conf->InverterCode[0] = 0x12;
         conf->InverterCode[1] = 0x1a;
         conf->InverterCode[2] = 0xd9;
         conf->InverterCode[3] = 0x38;
         conf->ArchiveCode    = 0x71;
+    }
+    if( strcmp(conf->Inverter, "3000TLHF") == 0 ) {
+        conf->InverterCode[0] = 0x1b;
+        conf->InverterCode[1] = 0xb1;
+        conf->InverterCode[2] = 0xa6;
+        conf->InverterCode[3] = 0x38;
+        conf->ArchiveCode    = 0x83;
     }
     if( strcmp(conf->Inverter, "4000TL") == 0 ) {
         conf->InverterCode[0] = 0x78;
