@@ -711,7 +711,7 @@ char *  sunrise( float latitude, float longitude )
    localT = UT + localOffset;
    if( localT < 0 ) localT=localT+24;
    if( localT > 24 ) localT=localT-24;
-   sprintf( returntime, "%02.0f:%02.0f",floor(localT),(localT-floor(localT))*60 ); 
+   sprintf( returntime, "%02.0f:%02.0f",floor(localT),floor(localT-floor((localT))*60 )); 
    return returntime;
 }
 
@@ -787,7 +787,7 @@ char * sunset( float latitude, float longitude )
    localT = UT + localOffset;
    if( localT < 0 ) localT=localT+24;
    if( localT > 24 ) localT=localT-24;
-   sprintf( returntime, "%02.0f:%02.0f",floor(localT),(localT-floor(localT))*60 ); 
+   sprintf( returntime, "%02.0f:%02.0f",floor(localT),floor((localT-floor(localT))*60 )); 
    return returntime;
 }
 
@@ -1072,6 +1072,13 @@ void  SetInverterType( ConfType * conf )
         conf->InverterCode[3] = 0x39;
         conf->ArchiveCode     = 0x4e;
     }
+    if( strcmp(conf->Inverter, "7000") == 0 ) {
+        conf->InverterCode[0] = 0xcf;
+        conf->InverterCode[1] = 0x84;
+        conf->InverterCode[2] = 0x84;
+        conf->InverterCode[3] = 0x3a;
+        conf->ArchiveCode     = 0x63;
+    }
     if( strcmp(conf->Inverter, "10000TL") == 0 ) {
         conf->InverterCode[0] = 0x69;
         conf->InverterCode[1] = 0x45;
@@ -1330,7 +1337,7 @@ void InitConfig( ConfType *conf, char * datefrom, char * dateto )
     strcpy( conf->MySqlDatabase, "smatool" );  
     strcpy( conf->MySqlUser, "" );  
     strcpy( conf->MySqlPwd, "" );  
-    strcpy( conf->PVOutputURL, "http://pvoutput.org/service/r1/addstatus.jsp" );  
+    strcpy( conf->PVOutputURL, "http://pvoutput.org/service/r2/addstatus.jsp" );  
     strcpy( conf->PVOutputKey, "" );  
     strcpy( conf->PVOutputSid, "" );  
     strcpy( datefrom, "" );  
@@ -2533,7 +2540,7 @@ int main(int argc, char **argv)
             }
             else  //Use batch mode 10 values at a time!
             */
-        sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d0000000\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 1 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC" );
+        sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d0000000\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 14 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC" );
         if (debug == 1) printf("%s\n",SQLQUERY);
         DoQuery(SQLQUERY);
         batch_count=0;
@@ -2575,7 +2582,7 @@ int main(int argc, char **argv)
                 {
 	            curl = curl_easy_init();
 	            if (curl){
-	                sprintf(compurl,"http://pvoutput.org/service/r1/addbatchstatus.jsp?data=%s&key=%s&sid=%s",batch_string,conf.PVOutputKey,conf.PVOutputSid);
+	                sprintf(compurl,"http://pvoutput.org/service/r2/addbatchstatus.jsp?data=%s&key=%s&sid=%s",batch_string,conf.PVOutputKey,conf.PVOutputSid);
 	                if (debug == 1) printf("url = %s\n",compurl); 
 	                curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		        curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
@@ -2584,7 +2591,7 @@ int main(int argc, char **argv)
 		        curl_easy_cleanup(curl);
                         if( result==0 ) 
                         {
-                           sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d0000000\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 1 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC limit %d", batch_count );
+                           sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d0000000\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 14 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC limit %d", batch_count );
                            if (debug == 1) printf("%s\n",SQLQUERY);
                            DoQuery1(SQLQUERY);
                            while ((row1 = mysql_fetch_row(res1)))  //Need to update these
@@ -2606,7 +2613,7 @@ int main(int argc, char **argv)
             {
 	        curl = curl_easy_init();
 	        if (curl){
-	            sprintf(compurl,"http://pvoutput.org/service/r1/addbatchstatus.jsp?data=%s&key=%s&sid=%s",batch_string,conf.PVOutputKey,conf.PVOutputSid);
+	            sprintf(compurl,"http://pvoutput.org/service/r2/addbatchstatus.jsp?data=%s&key=%s&sid=%s",batch_string,conf.PVOutputKey,conf.PVOutputSid);
 	            if (debug == 1) printf("url = %s\n",compurl); 
 	            curl_easy_setopt(curl, CURLOPT_URL, compurl);
 	            curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
@@ -2661,6 +2668,7 @@ if ((repost ==1)&&(error==0)){
         fp=fopen( "/tmp/curl_output", "w+" );
         update_data = 0;
         dtotal = atof(row[1]);
+        sleep(2);  //pvoutput limits 1 second output
 	ret=sprintf(compurl,"http://pvoutput.org/service/r1/getstatistic.jsp?df=%s&dt=%s&key=%s&sid=%s",row[0],row[0],conf.PVOutputKey,conf.PVOutputSid);
         curl = curl_easy_init();
         if (curl){
@@ -2695,7 +2703,7 @@ if ((repost ==1)&&(error==0)){
              if( update_data == 1 ) {
                  curl = curl_easy_init();
                  if (curl){
-	            ret=sprintf(compurl,"http://pvoutput.org/service/r1/addoutput.jsp?d=%s&g=%f&key=%s&sid=%s",row[0],dtotal,conf.PVOutputKey,conf.PVOutputSid);
+	            ret=sprintf(compurl,"http://pvoutput.org/service/r2/addoutput.jsp?d=%s&g=%f&key=%s&sid=%s",row[0],dtotal,conf.PVOutputKey,conf.PVOutputSid);
                     if (debug == 1) printf("url = %s\n",compurl);
 		    curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		    curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
