@@ -62,6 +62,7 @@ typedef struct{
     char PVOutputURL[80];       /*--pvouturl    -url 	*/
     char PVOutputKey[80];       /*--pvoutkey    -key 	*/
     char PVOutputSid[20];       /*--pvoutsid    -sid 	*/
+    char Setting[80];           /*inverter model data*/
     unsigned char InverterCode[4]; /*Unknown code inverter specific*/
     unsigned int ArchiveCode;    /* Code for archive data */
 } ConfType;
@@ -1049,6 +1050,10 @@ void  SetInverterType( ConfType * conf )
         conf->InverterCode[1] = 0x1a;
         conf->InverterCode[2] = 0xd9;
         conf->InverterCode[3] = 0x38;
+        conf->InverterCode[0] = 0x32;
+        conf->InverterCode[1] = 0x42;
+        conf->InverterCode[2] = 0x85;
+        conf->InverterCode[3] = 0x38;
         conf->ArchiveCode    = 0x71;
     }
     if( strcmp(conf->Inverter, "3000TLHF") == 0 ) {
@@ -1326,9 +1331,10 @@ ReadStream( ConfType * conf, int * s, unsigned char * stream, int * streamlen, u
 void InitConfig( ConfType *conf, char * datefrom, char * dateto )
 {
     strcpy( conf->Config,"./smatool.conf");
+    strcpy( conf->Setting,"./invcode.in");
     strcpy( conf->Inverter, "" );  
     strcpy( conf->BTAddress, "" );  
-    conf->bt_timeout = 5;  
+    conf->bt_timeout = 30;  
     strcpy( conf->Password, "0000" );  
     strcpy( conf->File, "sma.in.new" );  
     conf->latitude_f = 999 ;  
@@ -1340,6 +1346,11 @@ void InitConfig( ConfType *conf, char * datefrom, char * dateto )
     strcpy( conf->PVOutputURL, "http://pvoutput.org/service/r2/addstatus.jsp" );  
     strcpy( conf->PVOutputKey, "" );  
     strcpy( conf->PVOutputSid, "" );  
+    conf->InverterCode[0]=0;  
+    conf->InverterCode[1]=0;  
+    conf->InverterCode[2]=0;  
+    conf->InverterCode[3]=0;  
+    conf->ArchiveCode=0;  
     strcpy( datefrom, "" );  
     strcpy( dateto, "" );  
 }
@@ -1410,6 +1421,77 @@ int GetConfig( ConfType *conf )
         }
     }
     fclose( fp );
+    return( 0 );
+}
+
+/* read  Inverter Settings from file */
+int GetInverterSetting( ConfType *conf )
+{
+    FILE 	*fp;
+    char	line[400];
+    char	variable[400];
+    char	value[400];
+    int		found_inverter=0;
+
+    if (strlen(conf->Setting) > 0 )
+    {
+        if(( fp=fopen(conf->Setting,"r")) == (FILE *)NULL )
+        {
+           printf( "Error! Could not open file %s\n", conf->Setting );
+           return( -1 ); //Could not open file
+        }
+    }
+    else
+    {
+        if(( fp=fopen("./invcode.in","r")) == (FILE *)NULL )
+        {
+           printf( "Error! Could not open file ./invcode.in\n" );
+           return( -1 ); //Could not open file
+        }
+    }
+    while (!feof(fp)){	
+	if (fgets(line,400,fp) != NULL){				//read line from smatool.conf
+            if( line[0] != '#' ) 
+            {
+                strcpy( value, "" ); //Null out value
+                sscanf( line, "%s %s", variable, value );
+                if( debug == 1 ) printf( "variable=%s value=%s\n", variable, value );
+                if( value[0] != '\0' )
+                {
+                    if( strcmp( variable, "Inverter" ) == 0 )
+                    {
+                       if( strcmp( value, conf->Inverter ) == 0 )
+                          found_inverter = 1;
+                       else
+                          found_inverter = 0;
+                    }
+                    if(( strcmp( variable, "Code1" ) == 0 )&& found_inverter )
+                    {
+                       sscanf( value, "%X", &conf->InverterCode[0] );
+                    }
+                    if(( strcmp( variable, "Code2" ) == 0 )&& found_inverter )
+                       sscanf( value, "%X", &conf->InverterCode[1] );
+                    if(( strcmp( variable, "Code3" ) == 0 )&& found_inverter )
+                       sscanf( value, "%X", &conf->InverterCode[2] );
+                    if(( strcmp( variable, "Code4" ) == 0 )&& found_inverter )
+                       sscanf( value, "%X", &conf->InverterCode[3] );
+                    if(( strcmp( variable, "InvCode" ) == 0 )&& found_inverter )
+                       sscanf( value, "%X", &conf->ArchiveCode );
+                }
+            }
+        }
+    }
+    fclose( fp );
+    if(( conf->InverterCode[0] == 0 ) ||
+       ( conf->InverterCode[1] == 0 ) ||
+       ( conf->InverterCode[2] == 0 ) ||
+       ( conf->InverterCode[3] == 0 ) ||
+       ( conf->ArchiveCode == 0 ))
+    {
+       printf( "\n Error ! not all codes set\n" );
+       fclose( fp );
+       return( -1 );
+    }
     return( 0 );
 }
 
@@ -1708,6 +1790,9 @@ int main(int argc, char **argv)
     // read command arguments  again - they overide config
     if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost, &test, &install, &update ) < 0 )
         exit(0);
+    // read Inverter Setting file
+    if( GetInverterSetting( &conf ) < 0 )
+        exit(-1);
     // set switches used through the program
     SetSwitches( &conf, datefrom, dateto, &location, &mysql, &post, &file, &daterange, &test );  
     if(( install==1 )&&( mysql==1 ))
@@ -1721,7 +1806,7 @@ int main(int argc, char **argv)
         exit(0);
     }
     // Set value for inverter type
-    SetInverterType( &conf );
+    //SetInverterType( &conf );
     // Get Return Value lookup from file
     returnkeylist = InitReturnKeys( &conf, returnkeylist, &num_return_keys );
     // Get Local Timezone offset in seconds
@@ -1750,23 +1835,24 @@ int main(int argc, char **argv)
 	  fp=fopen(conf.File,"r");
         else
 	  fp=fopen("/etc/sma.in","r");
-	// allocate a socket
-   s = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
+   for( i=1; i<20; i++ ){
+      // allocate a socket
+      s = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
 
-   // set the connection parameters (who to connect to)
-   addr.rc_family = AF_BLUETOOTH;
-   addr.rc_channel = (uint8_t) 1;
-   str2ba( conf.BTAddress, &addr.rc_bdaddr );
+      // set the connection parameters (who to connect to)
+      addr.rc_family = AF_BLUETOOTH;
+      addr.rc_channel = (uint8_t) 1;
+      str2ba( conf.BTAddress, &addr.rc_bdaddr );
 
-   // connect to server
-   if( debug==1 ) { printf( "datefrom=%s dateto=%s\n", datefrom, dateto ); }
-   for( i=1; i<5; i++ ){
+      // connect to server
+      if( debug==1 ) { printf( "datefrom=%s dateto=%s\n", datefrom, dateto ); }
       status = connect(s, (struct sockaddr *)&addr, sizeof(addr));
-	if (status <0){
-		printf("Error connecting to %s\n",conf.BTAddress);
-	}
-        else
-           break;
+      if (status <0){
+          printf("Error connecting to %s\n",conf.BTAddress);
+          close( s );
+      }
+      else
+          break;
    }
    if (status < 0 )
    {
@@ -2284,7 +2370,7 @@ int main(int argc, char **argv)
                                     archdatalen=0;
                                     strcpy( lineread, "" );
                                     failedbluetooth++;
-                                    if( failedbluetooth > 10 )
+                                    if( failedbluetooth > 60 )
                                         exit(-1);
                                     goto start;
                                     //exit(-1);
@@ -2540,7 +2626,7 @@ int main(int argc, char **argv)
             }
             else  //Use batch mode 10 values at a time!
             */
-        sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d0000000\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 14 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC" );
+        sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d0000000\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 13 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC" );
         if (debug == 1) printf("%s\n",SQLQUERY);
         DoQuery(SQLQUERY);
         batch_count=0;
@@ -2573,6 +2659,7 @@ int main(int argc, char **argv)
         {
             while ((row = mysql_fetch_row(res)))  //Need to update these
             {
+                sleep(2);
                 if( batch_count > 0 )
                     sprintf( batch_string,"%s;%s,%s,%s,%s", batch_string, row[0], row[1], row[2], row[3] ); 
                 else
@@ -2587,6 +2674,7 @@ int main(int argc, char **argv)
 	                curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		        curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 		        result = curl_easy_perform(curl);
+                        sleep(1);
 	                if (debug == 1) printf("result = %d\n",result);
 		        curl_easy_cleanup(curl);
                         if( result==0 ) 
@@ -2618,6 +2706,7 @@ int main(int argc, char **argv)
 	            curl_easy_setopt(curl, CURLOPT_URL, compurl);
 	            curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 	            result = curl_easy_perform(curl);
+                    sleep(1);
 	            if (debug == 1) printf("result = %d\n",result);
 		    curl_easy_cleanup(curl);
                     if( result==0 ) 
@@ -2708,6 +2797,7 @@ if ((repost ==1)&&(error==0)){
 		    curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		    curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 		    result = curl_easy_perform(curl);
+                    sleep(1);
 	            if (debug == 1) printf("result = %d\n",result);
 		    curl_easy_cleanup(curl);
                     if( result==0 ) 
