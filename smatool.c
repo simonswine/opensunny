@@ -2209,9 +2209,9 @@ int main(int argc, char **argv)
 			            fl[cc] = send_count;
 				    cc++;
                                 break;
-				case 26: // $TIMEZONE timezone in seconds
-			            fl[cc] = tzhex[1];
-			            fl[cc+1] = tzhex[0];
+				case 26: // $TIMEZONE timezone in seconds, reverse endian
+			            fl[cc] = tzhex[0];
+			            fl[cc+1] = tzhex[1];
 				    cc+=2;
                                 break;
 				case 27: // $TIMESET unknown setting
