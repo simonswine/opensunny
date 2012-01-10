@@ -712,7 +712,7 @@ char *  sunrise( float latitude, float longitude )
    localT = UT + localOffset;
    if( localT < 0 ) localT=localT+24;
    if( localT > 24 ) localT=localT-24;
-   sprintf( returntime, "%02.0f:%02.0f",floor(localT),floor(localT-floor((localT))*60 )); 
+   sprintf( returntime, "%02.0f:%02.0f",floor(localT),floor((localT-floor(localT))*60) );
    return returntime;
 }
 
@@ -788,7 +788,7 @@ char * sunset( float latitude, float longitude )
    localT = UT + localOffset;
    if( localT < 0 ) localT=localT+24;
    if( localT > 24 ) localT=localT-24;
-   sprintf( returntime, "%02.0f:%02.0f",floor(localT),floor((localT-floor(localT))*60 )); 
+   sprintf( returntime, "%02.0f:%02.0f",floor(localT),floor((localT-floor(localT))*60) );
    return returntime;
 }
 
@@ -935,7 +935,7 @@ int todays_almanac( ConfType *conf )
 
     OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
-    sprintf(SQLQUERY,"SELECT sunrise FROM Almanac WHERE date=DATE_FORMAT( NOW(), \"%%Y%%m%%d\" ) " );
+    sprintf(SQLQUERY,"SELECT sunrise FROM Almanac WHERE date=DATE_FORMAT( NOW(), \"%%Y-%%m-%%d\" ) " );
     if (debug == 1) printf("%s\n",SQLQUERY);
     DoQuery(SQLQUERY);
     if ((row = mysql_fetch_row(res)))  //if there is a result, update the row
@@ -2577,7 +2577,9 @@ int main(int argc, char **argv)
         {
             starttotal = atof( (char *)row[0] );
     
-            if( archdatalen < 3 ) //Use Batch mode if greater
+           /* if( archdatalen < 3 ) //Use Batch mode if greater
+           if ( 1 = 2 ) //Always use batch mode, r2 api is better and r1 may go away one day
+            
             {
                 for( i=1; i<archdatalen; i++ ) { //Start at 1 as the first record is a dummy
                    if((archdatalist+i)->current_value > 0 )
