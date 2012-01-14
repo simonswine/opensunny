@@ -1726,7 +1726,7 @@ int main(int argc, char **argv)
         int  initstarted=0,setupstarted=0,rangedatastarted=0;
         long returnpos;
         int returnline;
-        char compurl[200];
+        char compurl[400];  //seg error on curl fix 2012.01.14
 	char datefrom[100];
 	char dateto[100];
         int  pass_i;
