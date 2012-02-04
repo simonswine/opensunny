@@ -2354,7 +2354,8 @@ int main(int argc, char **argv)
                                     if( reporttime > idate ) {
                                        if( debug == 1 )
                                            printf( "delay=%d\n", (int)(reporttime-idate) );
-                                       sleep( reporttime - idate );
+                                       //sleep( reporttime - idate );
+                                       sleep(5);    //was sleeping for > 1min excessive
                                     }
                                 }
                                 else
