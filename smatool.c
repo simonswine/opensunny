@@ -2056,7 +2056,7 @@ int main(int argc, char **argv)
 				case 13: // $TIMEFROM1	
 				// get report time and convert
                                 if( daterange == 1 ) {
-                                    if( strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm) == (time_t)NULL ) 
+                                    if( strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm) == 0 ) 
                                     {
                                         if( debug==1 ) printf( "datefrom %s\n", datefrom );
                                         printf( "Time Coversion Error\n" );
