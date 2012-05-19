@@ -1,20 +1,13 @@
-#include <mysql/mysql.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
+#include "mysql.h"
 
 MYSQL *conn;
 MYSQL_RES *res;
 MYSQL_RES *res1;
 MYSQL_RES *res2;
 
-
 void OpenMySqlDatabase (char *server, char *user, char *password, char *database)
 {
-   
-	
-	conn = mysql_init(NULL);
+   conn = mysql_init(NULL);
    /* Connect to database */
    if (!mysql_real_connect(conn, server,
          user, password, database, 0, NULL, 0)) {
@@ -32,7 +25,8 @@ void CloseMySqlDatabase()
    mysql_close(conn);
 }
 
-int DoQuery (char query[1000]){
+int DoQuery (char query[1000])
+{
 	/* execute query */
 	
 	if (mysql_real_query(conn, query, strlen(query))){
@@ -42,7 +36,8 @@ int DoQuery (char query[1000]){
 	return *mysql_error(conn);
 }
 
-int DoQuery1 (char query[1000]){
+int DoQuery1 (char query[1000])
+{
 	/* execute query */
 	
 	if (mysql_real_query(conn, query, strlen(query))){
@@ -52,7 +47,8 @@ int DoQuery1 (char query[1000]){
 	return *mysql_error(conn);
 }
 
-int DoQuery2 (char query[1000]){
+int DoQuery2 (char query[1000])
+{
 	/* execute query */
 	
 	if (mysql_real_query(conn, query, strlen(query))){
