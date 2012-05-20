@@ -1060,7 +1060,11 @@ InitReturnKeys( ConfType * conf, ReturnType * returnkeylist, int * num_return_ke
 
    data_follows = 0;
 
-   fp=fopen(conf->File,"r");
+   if(( fp=fopen(conf->File,"r")) == (FILE *)NULL ) {
+     printf( "Error! Could not open file %s\n", conf->File );
+     exit( -1 ); //Could not open file
+   }
+
 
    while (!feof(fp)){	
 	if (fgets(line,400,fp) != NULL){				//read line from sma.in.new

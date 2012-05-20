@@ -14,7 +14,7 @@ smatool: $(OBJ) $(HEADER)
 	$(CC) ${CFLAGS} ${INCLUDES} -c -o $@ $<
 
 clean:
-	rm smatool *.o
+	rm smatool *.o *~
 
 refresh:
 	hg pull https://code.google.com/p/sma-bluetooth/
