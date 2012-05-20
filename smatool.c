@@ -37,7 +37,7 @@ typedef struct {
     unsigned char address[6];	/* reversed --address   */
     int  bt_timeout;		/*--timeout  	-t 	*/
     char Password[20];          /*--password 	-p 	*/
-    char Config[80];            /*--config   	-c 	*/
+    char ConfigFile[80];        /*--config   	-c 	*/
     char File[80];              /*--file     	-f 	*/
     float latitude_f;           /*--latitude  	-la 	*/
     float longitude_f;          /*--longitude 	-lo 	*/
@@ -294,7 +294,7 @@ tryfcs16(unsigned char *cp, int len)
     }
 }
 
-/* convert something */
+/* convert something? */
 unsigned char conv(char *nn)
 {
 	unsigned char tt=0,res=0;
@@ -342,7 +342,7 @@ unsigned char conv(char *nn)
 		return res;
 }
 
-/* check for send errors */
+/* check for send errors? */
 int
 check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int cc, unsigned char *last_sent, int *terminated, int *already_read )
 {
@@ -909,8 +909,8 @@ int check_schema( ConfType * conf )
     return found;
 }
 
-int todays_almanac( ConfType *conf )
 /*  Check if sunset and sunrise have been set today */
+int todays_almanac( ConfType *conf )
 {
     int	        found=0;
     MYSQL_ROW 	row;
@@ -1073,8 +1073,8 @@ InitReturnKeys( ConfType * conf, ReturnType * returnkeylist, int * num_return_ke
                 if( data_follows == 1 ) {
                     tmp.key1=0x0;
                     tmp.key2=0x0;
-                    strcpy( tmp.description, "" ); //Null out value
-                    strcpy( tmp.units, "" ); //Null out value
+                    strcpy( tmp.description, "" );	//Null out value
+                    strcpy( tmp.units, "" );		//Null out value
                     tmp.divisor=0;
                     reading=0;
                     if( sscanf( line, "%x %x", &tmp.key1, &tmp.key2  ) == 2 ) {
@@ -1199,7 +1199,7 @@ ReadStream( ConfType * conf, int * s, unsigned char * stream, int * streamlen, u
    int  i, j=0;
 
    (*togo)=ConvertStreamtoInt( stream+43, 2, togo );
-   if( debug==1 ) printf( "togo=%d\n", (*togo) );
+   debug_printf( "togo=%d\n", (*togo) );
    i=59; //Initial position of data stream
    (*datalen)=0;
    datalist=(unsigned char *)malloc(sizeof(char));
@@ -1242,7 +1242,7 @@ ReadStream( ConfType * conf, int * s, unsigned char * stream, int * streamlen, u
 /* Init Config to default values */
 void InitConfig( ConfType *conf, char * datefrom, char * dateto )
 {
-    strcpy( conf->Config,"./smatool.conf");
+    strcpy( conf->ConfigFile,"./smatool.conf");
     strcpy( conf->Setting,"./invcode.in");
     strcpy( conf->Inverter, "" );  
     strcpy( conf->BTAddress, "" );  
@@ -1275,11 +1275,11 @@ int GetConfig( ConfType *conf )
     char	variable[400];
     char	value[400];
 
-    if (strlen(conf->Config) > 0 )
+    if (strlen(conf->ConfigFile) > 0 )
     {
-        if(( fp=fopen(conf->Config,"r")) == (FILE *)NULL )
+        if(( fp=fopen(conf->ConfigFile,"r")) == (FILE *)NULL )
         {
-           printf( "Error! Could not open file %s\n", conf->Config );
+           printf( "Error! Could not open file %s\n", conf->ConfigFile );
            return( -1 ); //Could not open file
         }
     }
@@ -1454,7 +1454,7 @@ int ReadCommandConfig( ConfType *conf, int argc, char **argv, char * datefrom, c
 	else if ((strcmp(argv[i],"-c")==0)||(strcmp(argv[i],"--config")==0)){
 	    i++;
 	    if(i<argc){
-		strcpy(conf->Config,argv[i]);
+		strcpy(conf->ConfigFile,argv[i]);
 	    }
 	}
 	else if (strcmp(argv[i],"--test")==0) (*test)=1;
@@ -1686,20 +1686,25 @@ int main(int argc, char **argv)
     reporttime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
    
     // set config to defaults
+    debug_printf("Set default config\n");
     InitConfig( &conf, datefrom, dateto );
     // read command arguments needed so we can get config from config files
+    debug_printf("Read config from command Line\n");
     if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost, &test, &install, &update ) < 0 )
         exit(0);
     // read config from config file
+    debug_printf("Read config from config File.\n");
     if( GetConfig( &conf ) < 0 )
         exit(-1);
     // read command arguments  again - they overide config of config file
+    debug_printf("Override config from command line.\n");
     if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost, &test, &install, &update ) < 0 )
         exit(0);
     // read Inverter Setting file
     if( GetInverterSetting( &conf ) < 0 )
         exit(-1);
     // set switches used through the program
+    debug_printf("Parse ascii config and set switches.\n");
     SetSwitches( &conf, datefrom, dateto, &location, &mysql, &post, &file, &daterange, &test );
     if(( install==1 )&&( mysql==1 ))	// When --INSTALL switch is set and config for mysql is complete try to install DB tables
     {
@@ -1752,7 +1757,7 @@ int main(int argc, char **argv)
       debug_printf("datefrom=%s dateto=%s\n", datefrom, dateto );
       status = connect(s, (struct sockaddr *)&addr, sizeof(addr));
       if (status <0){
-          printf("%s line %d: Error connecting to %s\n", __FILE__, __LINE__, conf.BTAddress);
+          printf("Error connecting to %s\n", conf.BTAddress);
           close( s );
       }
       else
@@ -1765,6 +1770,8 @@ int main(int argc, char **argv)
 
    // convert BT address from config and reverse byte order
    address[5] = conv(strtok(conf.BTAddress,":"));
+   for( i=4; i==0; i-- ) {
+   }
    address[4] = conv(strtok(NULL,":"));
    address[3] = conv(strtok(NULL,":"));
    address[2] = conv(strtok(NULL,":"));

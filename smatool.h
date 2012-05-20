@@ -1,3 +1,7 @@
+/*
+ * smatool header file
+ * /
+
 #define _XOPEN_SOURCE /* glibc needs this */
 #include <stdio.h>
 #include <stdlib.h>
