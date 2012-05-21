@@ -86,7 +86,7 @@ E $ARCHIVEDATA1 $END;
 3f 26	"Total Power"		Watts			1
 1e 41	"Max Phase 1"		Watts			1	
 1f 41	"Max Phase 2"		Watts			1
-20 41	"Max Pahse 3"		Watts			1
+20 41	"Max Phase 3"		Watts			1
 66 41	"Unknown"		Unknown			1
 7f 41	"Unknown"		Unknown			1
 40 46	"Output Phase 1"	Watts			1
