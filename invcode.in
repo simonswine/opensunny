@@ -57,6 +57,13 @@ Code3	 	0xfb
 Code4	 	0x39
 InvCode		0x4e
 
+Inverter	5000TL20
+Code1		0xAD
+Code2	 	0x52
+Code3	 	0xB2
+Code4	 	0x3A
+InvCode		0x4E
+
 Inverter	5000TL21
 Code1		0xd6
 Code2		0x7d  
