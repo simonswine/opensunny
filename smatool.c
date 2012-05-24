@@ -427,11 +427,14 @@ int read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, i
     if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
         bytes_read = recv((*s), header, sizeof(header), 0); //Get length of string
 	(*rr) = 0;
+	if( debug == 1 ) printf("header: ");
         for( i=0; i<sizeof(header); i++ ) {
             received[(*rr)] = header[i];
 	    if (debug == 2) printf("%02x ", received[i]);
+	    if( debug == 1) printf("%02x ", received[i]);
             (*rr)++;
         }
+	if( debug == 1 ) printf("\n");
     }
     else
     {
@@ -441,7 +444,6 @@ int read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, i
        return -1;
     }
     
-    select((*s)+1, &readfds, NULL, NULL, &tv);
     if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
         bytes_read = recv((*s), buf, header[1]-3, 0); //Read the length specified by header
     }
@@ -451,6 +453,13 @@ int read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, i
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
+    }
+    if( debug == 1) {
+      printf("buf header[1]-3: ");
+      for(i=0;i<header[1]-3;i++) {
+        printf("%02x", buf[i]);
+      }
+      printf("\n");
     }
     if ( bytes_read > 0){
         debug_printf("\nReceiving\n");
@@ -1739,6 +1748,7 @@ int main(int argc, char **argv)
    while (!feof(fp)){	
         start:
 	if (fgets(line,400,fp) != NULL){				//read line from sma.in.new
+		debug_printf("%s", line);
 		linenum++;
 		lineread = strtok(line," ;");
 		if(!strcmp(lineread,"R")){		//See if line is something we need to receive
@@ -1789,6 +1799,7 @@ int main(int argc, char **argv)
 				for (i=0;i<cc;i++) printf("%02x ",fl[i]);
 			   printf("\n\n");
 			}
+
 			debug_printf("[%d] %s Waiting for data on rfcomm\n", linenum, debugdate());
 			found = 0;
 			do {
