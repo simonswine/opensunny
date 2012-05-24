@@ -17,6 +17,7 @@
 
 #include "mysql.h"
 #include "smatool.h"
+#include "utils.h"
 
 /*
  * u16 represents an unsigned 16-bit number.  Adjust the typedef for
@@ -34,7 +35,6 @@ typedef u_int16_t u16;
 typedef struct {
     char Inverter[20]; 		/*--inverter 	-i 	*/
     char BTAddress[20];         /*--address  	-a 	*/
-    unsigned char address[6];	/* reversed --address   */
     int  bt_timeout;		/*--timeout  	-t 	*/
     char Password[20];          /*--password 	-p 	*/
     char ConfigFile[80];        /*--config   	-c 	*/
@@ -294,54 +294,6 @@ tryfcs16(unsigned char *cp, int len)
     }
 }
 
-/* convert something? */
-unsigned char conv(char *nn)
-{
-	unsigned char tt=0,res=0;
-	int i;   
-	
-	for(i=0;i<2;i++){
-		switch(nn[i]){
-
-		case 65: /*A*/
-		case 97: /*a*/
-		tt = 10;
-		break;
-
-		case 66: /*B*/
-		case 98: /*b*/
-		tt = 11;
-		break;
-
-		case 67: /*C*/
-		case 99: /*c*/
-		tt = 12;
-		break;
-
-		case 68: /*D*/
-		case 100: /*d*/
-		tt = 13;
-		break;
-
-		case 69: /*E*/
-		case 101: /*e*/
-		tt = 14;
-		break;
-
-		case 70: /*F*/
-		case 102: /*f*/
-		tt = 15;
-		break;
-
-
-		default:
-		tt = nn[i] - 48;
-		}
-		res = res + (tt * pow(16,1-i));
-		}
-		return res;
-}
-
 /* check for send errors? */
 int
 check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int cc, unsigned char *last_sent, int *terminated, int *already_read )
@@ -359,10 +311,10 @@ check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int
     FD_ZERO(&readfds);
     FD_SET((*s), &readfds);
 				
-    select((*s)+1, &readfds, NULL, NULL, &tv);
-				
     (*terminated) = 0; // Tag to tell if string has 7e termination
+
     // first read the header to get the record length
+    select((*s)+1, &readfds, NULL, NULL, &tv);
     if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
         bytes_read = recv((*s), header, sizeof(header), 0); //Get length of string
 	(*rr) = 0;
@@ -374,17 +326,18 @@ check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int
     }
     else
     {
-       if( verbose==1) printf("Timeout reading bluetooth socket\n");
+       verbose_printf("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
     }
+    select((*s)+1, &readfds, NULL, NULL, &tv);
     if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
         bytes_read = recv((*s), buf, header[1]-3, 0); //Read the length specified by header
     }
     else
     {
-       if( verbose==1) printf("Timeout reading bluetooth socket\n");
+       verbose_printf("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
@@ -452,8 +405,7 @@ check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int
     return 0;
 }
 
-int
-read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, int cc, unsigned char *last_sent, int *terminated )
+int read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, int cc, unsigned char *last_sent, int *terminated )
 {
     int bytes_read,i,j;
     unsigned char buf[1024]; /*read buffer*/
@@ -468,10 +420,10 @@ read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, int c
     FD_ZERO(&readfds);
     FD_SET((*s), &readfds);
 				
-    select((*s)+1, &readfds, NULL, NULL, &tv);
-				
     (*terminated) = 0; // Tag to tell if string has 7e termination
+
     // first read the header to get the record length
+    select((*s)+1, &readfds, NULL, NULL, &tv);
     if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
         bytes_read = recv((*s), header, sizeof(header), 0); //Get length of string
 	(*rr) = 0;
@@ -483,17 +435,19 @@ read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, int c
     }
     else
     {
-       if( verbose==1) printf("Timeout reading bluetooth socket\n");
+       verbose_printf("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
     }
+    
+    select((*s)+1, &readfds, NULL, NULL, &tv);
     if (FD_ISSET((*s), &readfds)){	// did we receive anything within 5 seconds
         bytes_read = recv((*s), buf, header[1]-3, 0); //Read the length specified by header
     }
     else
     {
-       if( verbose==1) printf("Timeout reading bluetooth socket\n");
+       verbose_printf("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
@@ -526,7 +480,7 @@ read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, int c
            (*terminated) = 1;
         else
            (*terminated) = 0;
-        for (i=0;i<bytes_read;i++){ //start copy the rec buffer in to received
+        for (i=0;i<bytes_read;i++){ //start copy the rec buffer into received
             if (buf[i] == 0x7d){ //did we receive the escape char
 	        switch (buf[i+1]){   // act depending on the char after the escape char
 					
@@ -977,7 +931,7 @@ int auto_set_dates( ConfType * conf, int * daterange, int mysql, char * datefrom
     second = loctime->tm_sec; 
     sprintf( dateto, "%04d-%02d-%02d %02d:%02d:00", year, month, day, hour, minute );
     (*daterange)=1;
-    if( verbose == 1 ) printf( "Auto set dates from %s to %s\n", datefrom, dateto );
+    verbose_printf( "Auto set dates from %s to %s\n", datefrom, dateto );
     return 1;
 }
 
@@ -1060,11 +1014,11 @@ InitReturnKeys( ConfType * conf, ReturnType * returnkeylist, int * num_return_ke
 
    data_follows = 0;
 
+   // open file sma.in.new
    if(( fp=fopen(conf->File,"r")) == (FILE *)NULL ) {
      printf( "Error! Could not open file %s\n", conf->File );
      exit( -1 ); //Could not open file
    }
-
 
    while (!feof(fp)){	
 	if (fgets(line,400,fp) != NULL){				//read line from sma.in.new
@@ -1139,7 +1093,8 @@ int ConvertStreamtoInt( unsigned char * stream, int length, int * value )
    return (*value);
 }
 
-//Convert a recieved string to a value
+// Convert a recieved string to a value
+// Vermutlich Sekunden seit 1970
 time_t ConvertStreamtoTime( unsigned char * stream, int length, time_t * value )
 {
    int	i, nullvalue;
@@ -1212,7 +1167,7 @@ ReadStream( ConfType * conf, int * s, unsigned char * stream, int * streamlen, u
    while( finished != 1 ) {
      datalist=(unsigned char *)realloc(datalist,sizeof(char)*((*datalen)+(*streamlen)-i));
      while( finished_record != 1 ) {
-        if( i> 500 ) break; //Somthing has gone wrong
+        if( i> 500 ) break; //Something has gone wrong
         
         if(( i < (*streamlen) )&&(( (*terminated) != 1)||(i+3 < (*streamlen) ))) 
 	{
@@ -1286,15 +1241,8 @@ int GetConfig( ConfType *conf )
            printf( "Error! Could not open file %s\n", conf->ConfigFile );
            return( -1 ); //Could not open file
         }
-    }
-    else
-    {
-        if(( fp=fopen("./smatool.conf","r")) == (FILE *)NULL )
-        {
-           printf( "Error! Could not open file ./smatool.conf\n" );
-           return( -1 ); //Could not open file
-        }
-    }
+    } // no else required default filename "./smatool.conf" is set in config section
+
     while (!feof(fp)){	
 	if (fgets(line,400,fp) != NULL){				//read line from smatool.conf
             if( line[0] != '#' ) 
@@ -1704,7 +1652,9 @@ int main(int argc, char **argv)
     debug_printf("Override config from command line.\n");
     if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost, &test, &install, &update ) < 0 )
         exit(0);
+   
     // read Inverter Setting file
+    debug_printf("Read Inverter Settings File.\n");
     if( GetInverterSetting( &conf ) < 0 )
         exit(-1);
     // set switches used through the program
@@ -1729,7 +1679,7 @@ int main(int argc, char **argv)
        if( ! todays_almanac( &conf ) ) {
            sprintf( sunrise_time, "%s", sunrise(conf.latitude_f,conf.longitude_f ));
            sprintf( sunset_time, "%s", sunset(conf.latitude_f, conf.longitude_f ));
-           if( verbose==1) printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
+           verbose_printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
            update_almanac(  &conf, sunrise_time, sunset_time );
         }
     }
@@ -1739,17 +1689,22 @@ int main(int argc, char **argv)
     if(daterange==0 ) //auto set the dates
         auto_set_dates( &conf, &daterange, mysql, datefrom, dateto );
     else
-        if( verbose == 1 ) printf( "QUERY RANGE    from %s to %s\n", datefrom, dateto ); 
+        verbose_printf( "QUERY RANGE    from %s to %s\n", datefrom, dateto );
+
     if(( daterange==1 )&&((location=0)||(mysql==0)||is_light( &conf )))
     {
-	if (verbose ==1) printf("Address %s\n",conf.BTAddress);
+	verbose_printf("SMA Address %s\n",conf.BTAddress);
 
-        if (file ==1)
-	  fp=fopen(conf.File,"r");
-        else
-	  fp=fopen("/etc/sma.in","r");
+        if (file ==1) {
+	  if(( fp=fopen(conf.File,"r")) == (FILE *)NULL ) {
+	    printf( "Error! Could not open file %s\n", conf.File );
+	    exit( -1 ); //Could not open file
+	  }
+	  // no else needed as a default "sma.in.new" is set in config
+	}
+
+   // allocate a socket for bluetooth communication retry 20 times
    for( i=1; i<20; i++ ){
-      // allocate a socket
       s = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
 
       // set the connection parameters (who to connect to)
@@ -1758,6 +1713,7 @@ int main(int argc, char **argv)
       str2ba( conf.BTAddress, &addr.rc_bdaddr );
 
       // connect to server
+      debug_printf("Try to connect to SMA inverter via bluetooth.\n" );
       debug_printf("datefrom=%s dateto=%s\n", datefrom, dateto );
       status = connect(s, (struct sockaddr *)&addr, sizeof(addr));
       if (status <0){
@@ -1772,16 +1728,14 @@ int main(int argc, char **argv)
 	return( -1 );
    }
 
-   // convert BT address from config and reverse byte order
+   // convert BT address from config to hex and reverse byte order
    address[5] = conv(strtok(conf.BTAddress,":"));
-   for( i=4; i==0; i-- ) {
+   for( i=4; i>=0; i-- ) {
+     address[i] = conv(strtok(NULL,":"));
    }
-   address[4] = conv(strtok(NULL,":"));
-   address[3] = conv(strtok(NULL,":"));
-   address[2] = conv(strtok(NULL,":"));
-   address[1] = conv(strtok(NULL,":"));
-   address[0] = conv(strtok(NULL,":"));
-	
+   debug_printf("conf address %X:%X:%X:%X:%X:%X\n", address[0], address[1], address[2], address[3], address[4], address[5]);
+
+   // Read from sma.in... File
    while (!feof(fp)){	
         start:
 	if (fgets(line,400,fp) != NULL){				//read line from sma.in.new
@@ -2184,7 +2138,7 @@ int main(int argc, char **argv)
                                 serial[2]=data[18];
                                 serial[1]=data[17];
                                 serial[0]=data[16];
-			        if (verbose	== 1) printf( "serial=%02x:%02x:%02x:%02x\n",serial[3]&0xff,serial[2]&0xff,serial[1]&0xff,serial[0]&0xff ); 
+			        verbose_printf( "serial=%02x:%02x:%02x:%02x\n",serial[3]&0xff,serial[2]&0xff,serial[1]&0xff,serial[0]&0xff ); 
                                 free( data );
                                 break;
                                 
@@ -2316,7 +2270,7 @@ int main(int argc, char **argv)
                                        if( j > 11 ) {
                                          if( idate > 0 ) prev_idate=idate;
                                          else prev_idate=0;
-                                         idate=ConvertStreamtoTime( datarecord, 4, &idate );
+                                         idate=ConvertStreamtoTime( datarecord, 4, &idate );	// Seconds since 1970 from stream
                                          if( prev_idate == 0 )
                                             prev_idate = idate-300;
 
@@ -2330,7 +2284,7 @@ int main(int argc, char **argv)
                                          ConvertStreamtoFloat( datarecord+4, 8, &gtotal );
                                          if(archdatalen == 0 )
                                             ptotal = gtotal;
-	                                    printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts togo=%d i=%d crc=%d", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12, togo, i, crc_at_end);
+	                                    printf("\n%d/%d/%4d %02d:%02d:%02d  total=%.3f Kwh current=%.0f Watts togo=%d i=%d crc=%d\n", day, month, year, hour, minute,second, gtotal/1000, (gtotal-ptotal)*12, togo, i, crc_at_end);
                                          if( idate != prev_idate+300 ) {
                                             printf( "Date Error! prev=%d current=%d\n", (int)prev_idate, (int)idate );
                                             error=1;
@@ -2376,9 +2330,7 @@ int main(int argc, char **argv)
 				case 20: // SIGNAL signal strength
                           
 				strength  = (received[22] * 100.0)/0xff;
-	                        if (verbose == 1) {
-                                    printf("bluetooth signal = %.0f%%\n",strength);
-                                }
+	                        verbose_printf("bluetooth signal = %.0f%%\n",strength);
                                 break;		
 				case 22: // extract time strings $INVCODE
 				invcode=received[22];
@@ -2515,7 +2467,7 @@ int main(int argc, char **argv)
 	              debug_printf("url = %s\n",compurl); 
                       if (row = mysql_fetch_row(res))  //if there is a result, already done
                       {
-	                 if (verbose == 1) printf("Already Updated\n");
+	                 verbose_printf("Already Updated\n");
                       }
                       else
                       {
