@@ -2273,6 +2273,12 @@ int main(int argc, char **argv)
                                 while( finished != 1 ) {
                                     data = ReadStream( &conf, &s, received, &rr, data, &datalen, last_sent, cc, &terminated, &togo );
 
+				    if( isSMA2plusPackage(received, sizeof(received), debug) == TRUE ) {
+				      debug_printf("SMA2+ Package found -> break ARCHIVEDATA1\n");
+				      free( data);
+				      goto start;
+				    }
+
                                     j=0;
                                     for( i=0; i<datalen; i++ )
                                     {
