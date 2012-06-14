@@ -15,9 +15,12 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 
-#include "mysql.h"
+#include "db_mysql.h"
 #include "smatool.h"
 #include "utils.h"
+#include "logging.h"
+#include "in_bluetooth.h"
+#include "in_smadata2plus.h"
 
 /*
  * u16 represents an unsigned 16-bit number.  Adjust the typedef for
@@ -185,6 +188,7 @@ add_escapes(unsigned char *cp, int *len)
           cp[i+1] = cp[i]^0x20;
           cp[i]=0x7d;
           (*len)++;
+          break;
       }
    }
 }
@@ -197,11 +201,11 @@ fix_length_send(unsigned char *cp, int *len)
 {
     int	    delta=0;
 
-    debug_printf( "sum=%x\n", cp[1]+cp[3] );
+    log_debug( "sum=%x\n", cp[1]+cp[3] );
     if(( cp[1] != (*len)+1 ))
     {
       delta = (*len)+1 - cp[1];
-      debug_printf( "  length change from %x to %x diff=%x \n", cp[1],(*len)+1,cp[1]+cp[3] );
+      log_debug( "  length change from %x to %x diff=%x \n", cp[1],(*len)+1,cp[1]+cp[3] );
       cp[3] = (cp[1]+cp[3])-((*len)+1);
       cp[1] =(*len)+1;
 
@@ -234,7 +238,7 @@ fix_length_send(unsigned char *cp, int *len)
         case 0x62: cp[3]=0x1e; break;
         default: printf( "NO CONVERSION!" );getchar();break;
       }
-      debug_printf( "new sum=%x\n", cp[1]+cp[3] );
+      log_debug( "new sum=%x\n", cp[1]+cp[3] );
     }
 }
             
@@ -250,9 +254,9 @@ fix_length_received(unsigned char *received, int *len)
     if( received[1] != (*len) )
     {
       sum = received[1]+received[3];
-      debug_printf( "sum=%x", sum );
+      log_debug( "sum=%x", sum );
       delta = (*len) - received[1];
-      debug_printf( "length change from %x to %x\n", received[1], (*len) );
+      log_debug( "length change from %x to %x\n", received[1], (*len) );
       if(( received[3] != 0x13 )&&( received[3] != 0x14 )) { 
         received[1] = (*len);
         switch( received[1] ) {
@@ -320,13 +324,13 @@ check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int
 	(*rr) = 0;
         for( i=0; i<sizeof(header); i++ ) {
             received[(*rr)] = header[i];
-	    debug_printf("%02x ", received[(*rr)]);
+	    log_debug("%02x ", received[(*rr)]);
             (*rr)++;
         }
     }
     else
     {
-       verbose_printf("Timeout reading bluetooth socket\n");
+       log_verbose("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
@@ -337,13 +341,13 @@ check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int
     }
     else
     {
-       verbose_printf("Timeout reading bluetooth socket\n");
+       log_verbose("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
     }
     if ( bytes_read > 0){
-        debug_printf("\nReceiving\n");
+        log_debug("\nReceiving\n");
 	if (debug == 1){ 
            printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
            j=12;
@@ -391,7 +395,7 @@ check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int
 	    else { 
                received[(*rr)] = buf[i];
             }
-	    debug_printf("%02x ", received[(*rr)]);
+	    log_debug("%02x ", received[(*rr)]);
 	    (*rr)++;
 	}
         fix_length_received( received, rr );
@@ -399,7 +403,7 @@ check_send_error( ConfType * conf, int *s, int *rr, unsigned char *received, int
 	    printf("\n");
             for( i=0;i<(*rr); i++ ) printf("%02x ", received[(i)]);
         }
-	debug_printf("\n\n");
+	log_debug("\n\n");
         (*already_read)=1;
     }	
     return 0;
@@ -438,7 +442,7 @@ int read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, i
     }
     else
     {
-       verbose_printf("Timeout reading bluetooth socket\n");
+       log_verbose("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
@@ -449,7 +453,7 @@ int read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, i
     }
     else
     {
-       verbose_printf("Timeout reading bluetooth socket\n");
+       log_verbose("Timeout reading bluetooth socket\n");
        (*rr) = 0;
        memset(received,0,1024);
        return -1;
@@ -462,7 +466,7 @@ int read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, i
       printf("\n");
     }
     if ( bytes_read > 0){
-        debug_printf("\nReceiving\n");
+        log_debug("\nReceiving\n");
 	if (debug == 1){ 
            printf( "    %08x: .. .. .. .. .. .. .. .. .. .. .. .. ", 0 );
            j=12;
@@ -518,7 +522,7 @@ int read_bluetooth( ConfType * conf, int *s, int *rr, unsigned char *received, i
 	    printf("\n");
             for( i=0;i<(*rr); i++ ) printf("%02x ", received[(i)]);
         }
-	debug_printf("\n\n");
+	log_debug("\n\n");
     }	
     return 0;
 }
@@ -557,23 +561,23 @@ unsigned char *  get_timezone_in_seconds( unsigned char *tzhex )
    utctime = gmtime(&curtime);
    
 
-   debug_printf( "utc=%04d-%02d-%02d %02d:%02d local=%04d-%02d-%02d %02d:%02d diff %d hours\n", utctime->tm_year+1900, utctime->tm_mon+1,utctime->tm_mday,utctime->tm_hour,utctime->tm_min, year, month, day, hour, minute, hour-utctime->tm_hour );
+   log_debug( "utc=%04d-%02d-%02d %02d:%02d local=%04d-%02d-%02d %02d:%02d diff %d hours\n", utctime->tm_year+1900, utctime->tm_mon+1,utctime->tm_mday,utctime->tm_hour,utctime->tm_min, year, month, day, hour, minute, hour-utctime->tm_hour );
    localOffset=(hour-utctime->tm_hour)+(minute-utctime->tm_min)/60;
-   debug_printf( "localOffset=%f\n", localOffset );
+   log_debug( "localOffset=%f\n", localOffset );
    if(( year > utctime->tm_year+1900 )||( month > utctime->tm_mon+1 )||( day > utctime->tm_mday ))
       localOffset+=24;
    if(( year < utctime->tm_year+1900 )||( month < utctime->tm_mon+1 )||( day < utctime->tm_mday ))
       localOffset-=24;
-   debug_printf( "localOffset=%f isdst=%d\n", localOffset, isdst );
+   log_debug( "localOffset=%f isdst=%d\n", localOffset, isdst );
    if( isdst > 0 ) 
        localOffset=localOffset-1;
    tzsecs = (localOffset) * 3600 + 1;
    if( tzsecs < 0 )
        tzsecs=65536+tzsecs;
-   debug_printf( "tzsecs=%x %d\n", tzsecs, tzsecs );
+   log_debug( "tzsecs=%x %d\n", tzsecs, tzsecs );
    tzhex[1] = tzsecs/256;
    tzhex[0] = tzsecs -(tzsecs/256)*256;
-   debug_printf( "tzsecs=%02x %02x\n", tzhex[1], tzhex[0] );
+   log_debug( "tzsecs=%02x %02x\n", tzhex[1], tzhex[0] );
 
    return tzhex;
 }
@@ -603,14 +607,14 @@ char *  sunrise( float latitude, float longitude )
    utctime = gmtime(&curtime);
    
 
-   debug_printf( "utc=%04d-%02d-%02d %02d:%02d local=%04d-%02d-%02d %02d:%02d diff %d hours\n", utctime->tm_year+1900, utctime->tm_mon+1,utctime->tm_mday,utctime->tm_hour,utctime->tm_min, year, month, day, hour, minute, hour-utctime->tm_hour );
+   log_debug( "utc=%04d-%02d-%02d %02d:%02d local=%04d-%02d-%02d %02d:%02d diff %d hours\n", utctime->tm_year+1900, utctime->tm_mon+1,utctime->tm_mday,utctime->tm_hour,utctime->tm_min, year, month, day, hour, minute, hour-utctime->tm_hour );
    localOffset=(hour-utctime->tm_hour)+(minute-utctime->tm_min)/60;
-   debug_printf( "localOffset=%f\n", localOffset );
+   log_debug( "localOffset=%f\n", localOffset );
    if(( year > utctime->tm_year+1900 )||( month > utctime->tm_mon+1 )||( day > utctime->tm_mday ))
       localOffset+=24;
    if(( year < utctime->tm_year+1900 )||( month < utctime->tm_mon+1 )||( day < utctime->tm_mday ))
       localOffset-=24;
-   debug_printf( "localOffset=%f\n", localOffset );
+   log_debug( "localOffset=%f\n", localOffset );
    lngHour = longitude / 15;
    t = loctime->tm_yday + ((6 - lngHour) / 24);
    //Calculate the Sun's mean anomaly
@@ -717,9 +721,9 @@ char * sunset( float latitude, float longitude )
    //calculate the Sun's local hour angle
    cosH = (cos((pi/180)*zenith) - (sinDec * sin((pi/180)*latitude))) / (cosDec * cos((pi/180)*latitude));
 	
-   if (cosH >  1); 
+   //if (cosH >  1);
 	  //the sun never rises on this location (on the specified date)
-   if (cosH < -1);
+   //if (cosH < -1);
 	  //the sun never sets on this location (on the specified date)
    //finish calculating H and convert into hours
    H = (180/pi)*acos(cosH);
@@ -745,11 +749,11 @@ int install_mysql_tables( ConfType * conf )
     MYSQL_ROW 	row;
     char 	SQLQUERY[1000];
 
-    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, "mysql");
+    db_mysql_open_db( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, "mysql");
     //Get Start of day value
     sprintf(SQLQUERY,"SHOW DATABASES" );
-    debug_printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
+    log_debug("%s\n",SQLQUERY);
+    db_mysql_query(SQLQUERY);
     while ((row = mysql_fetch_row(res)))  //if there is a result, update the row
     {
        if( strcmp( row[0], conf->MySqlDatabase ) == 0 )
@@ -761,12 +765,12 @@ int install_mysql_tables( ConfType * conf )
     if( found == 0 )
     {
        sprintf( SQLQUERY,"CREATE DATABASE IF NOT EXISTS %s", conf->MySqlDatabase );
-       debug_printf("%s\n",SQLQUERY);
-       DoQuery(SQLQUERY);
+       log_debug("%s\n",SQLQUERY);
+       db_mysql_query(SQLQUERY);
 
        sprintf( SQLQUERY,"USE  %s", conf->MySqlDatabase );
-       debug_printf("%s\n",SQLQUERY);
-       DoQuery(SQLQUERY);
+       log_debug("%s\n",SQLQUERY);
+       db_mysql_query(SQLQUERY);
 
        sprintf( SQLQUERY,"CREATE TABLE `Almanac` ( `id` bigint(20) NOT NULL \
           AUTO_INCREMENT, \
@@ -778,8 +782,8 @@ int install_mysql_tables( ConfType * conf )
            UNIQUE KEY `date` (`date`)\
            ) ENGINE=MyISAM" );
 
-       debug_printf("%s\n",SQLQUERY);
-       DoQuery(SQLQUERY);
+       log_debug("%s\n",SQLQUERY);
+       db_mysql_query(SQLQUERY);
   
        sprintf( SQLQUERY, "CREATE TABLE `DayData` ( \
            `DateTime` datetime NOT NULL, \
@@ -792,8 +796,8 @@ int install_mysql_tables( ConfType * conf )
            PRIMARY KEY (`DateTime`,`Inverter`,`Serial`) \
            ) ENGINE=MyISAM" );
 
-       debug_printf("%s\n",SQLQUERY);
-       DoQuery(SQLQUERY);
+       log_debug("%s\n",SQLQUERY);
+       db_mysql_query(SQLQUERY);
 
        sprintf( SQLQUERY, "CREATE TABLE `settings` ( \
            `value` varchar(128) NOT NULL, \
@@ -801,14 +805,14 @@ int install_mysql_tables( ConfType * conf )
            PRIMARY KEY (`value`) \
            ) ENGINE=MyISAM" );
 
-       debug_printf("%s\n",SQLQUERY);
-       DoQuery(SQLQUERY);
+       log_debug("%s\n",SQLQUERY);
+       db_mysql_query(SQLQUERY);
         
        
        sprintf( SQLQUERY, "INSERT INTO `settings` SET `value` = \'schema\', `data` = \'%s\' ", SCHEMA );
 
-       debug_printf("%s\n",SQLQUERY);
-       DoQuery(SQLQUERY);
+       log_debug("%s\n",SQLQUERY);
+       db_mysql_query(SQLQUERY);
     }
     mysql_close(conn);
 
@@ -822,14 +826,14 @@ void update_mysql_tables( ConfType * conf )
     MYSQL_ROW 	row;
     char 	SQLQUERY[1000];
 
-    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, "mysql");
+    db_mysql_open_db( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, "mysql");
     sprintf( SQLQUERY,"USE  %s", conf->MySqlDatabase );
-    debug_printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
+    log_debug("%s\n",SQLQUERY);
+    db_mysql_query(SQLQUERY);
     /*Check current schema value*/
     sprintf(SQLQUERY,"SELECT data FROM settings WHERE value=\'schema\' " );
-    debug_printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
+    log_debug("%s\n",SQLQUERY);
+    db_mysql_query(SQLQUERY);
     if ((row = mysql_fetch_row(res)))  //if there is a result, update the row
     {
        schema_value=atoi(row[0]);
@@ -837,11 +841,11 @@ void update_mysql_tables( ConfType * conf )
     mysql_free_result(res);
     if( schema_value == 1 ) { //Upgrade from 1 to 2
         sprintf(SQLQUERY,"ALTER TABLE `DayData` CHANGE `ETotalToday` `ETotalToday` DECIMAL(10,3) NULL DEFAULT NULL" );
-        debug_printf("%s\n",SQLQUERY);
-        DoQuery(SQLQUERY);
+        log_debug("%s\n",SQLQUERY);
+        db_mysql_query(SQLQUERY);
         sprintf( SQLQUERY, "UPDATE `settings` SET `value` = \'schema\', `data` = 2 " );
-        debug_printf("%s\n",SQLQUERY);
-        DoQuery(SQLQUERY);
+        log_debug("%s\n",SQLQUERY);
+        db_mysql_query(SQLQUERY);
     }
     mysql_close(conn);
 }
@@ -853,11 +857,11 @@ int check_schema( ConfType * conf )
     MYSQL_ROW 	row;
     char 	SQLQUERY[200];
 
-    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
+    db_mysql_open_db( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT data FROM settings WHERE value=\'schema\' " );
-    debug_printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
+    log_debug("%s\n",SQLQUERY);
+    db_mysql_query(SQLQUERY);
     if ((row = mysql_fetch_row(res)))  //if there is a result, update the row
     {
        if( strcmp( row[0], SCHEMA ) == 0 )
@@ -879,11 +883,11 @@ int todays_almanac( ConfType *conf )
     MYSQL_ROW 	row;
     char 	SQLQUERY[200];
 
-    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
+    db_mysql_open_db( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT sunrise FROM Almanac WHERE date=DATE_FORMAT( NOW(), \"%%Y-%%m-%%d\" ) " );
-    debug_printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
+    log_debug("%s\n",SQLQUERY);
+    db_mysql_query(SQLQUERY);
     if ((row = mysql_fetch_row(res)))  //if there is a result, update the row
     {
        found=1;
@@ -896,11 +900,11 @@ void update_almanac( ConfType *conf, char * sunrise, char * sunset )
 {
     char 	SQLQUERY[200];
 
-    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
+    db_mysql_open_db( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"INSERT INTO Almanac SET sunrise=CONCAT(DATE_FORMAT( NOW(), \"%%Y-%%m-%%d \"),\"%s\"), sunset=CONCAT(DATE_FORMAT( NOW(), \"%%Y-%%m-%%d \"),\"%s\" ), date=NOW() ", sunrise, sunset );
-    debug_printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
+    log_debug("%s\n",SQLQUERY);
+    db_mysql_query(SQLQUERY);
     mysql_close(conn);
 }
 
@@ -915,11 +919,11 @@ int auto_set_dates( ConfType * conf, int * daterange, int mysql, char * datefrom
 
     if( mysql == 1 )
     {
-        OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
+        db_mysql_open_db( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
         //Get last updated value
         sprintf(SQLQUERY,"SELECT DATE_FORMAT( DateTime, \"%%Y-%%m-%%d %%H:%%i:%%S\" ) FROM DayData ORDER BY DateTime DESC LIMIT 1" );
-        debug_printf("%s\n",SQLQUERY);
-        DoQuery(SQLQUERY);
+        log_debug("%s\n",SQLQUERY);
+        db_mysql_query(SQLQUERY);
         if ((row = mysql_fetch_row(res)))  //if there is a result, update the row
         {
            strcpy( datefrom, row[0] );
@@ -940,7 +944,7 @@ int auto_set_dates( ConfType * conf, int * daterange, int mysql, char * datefrom
     second = loctime->tm_sec; 
     sprintf( dateto, "%04d-%02d-%02d %02d:%02d:00", year, month, day, hour, minute );
     (*daterange)=1;
-    verbose_printf( "Auto set dates from %s to %s\n", datefrom, dateto );
+    log_verbose( "Auto set dates from %s to %s\n", datefrom, dateto );
     return 1;
 }
 
@@ -951,19 +955,19 @@ int is_light( ConfType * conf )
     MYSQL_ROW 	row;
     char 	SQLQUERY[200];
 
-    OpenMySqlDatabase( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
+    db_mysql_open_db( conf->MySqlHost, conf->MySqlUser, conf->MySqlPwd, conf->MySqlDatabase);
     //Get Start of day value
     sprintf(SQLQUERY,"SELECT if(sunrise < NOW(),1,0) FROM Almanac WHERE date= DATE_FORMAT( NOW(), \"%%Y-%%m-%%d\" ) " );
-    debug_printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
+    log_debug("%s\n",SQLQUERY);
+    db_mysql_query(SQLQUERY);
     if ((row = mysql_fetch_row(res)))  //if there is a result, update the row
     {
        if( atoi( (char *)row[0] ) == 0 ) light=0;
     }
     if( light ) {
        sprintf(SQLQUERY,"SELECT if( dd.datetime > al.sunset,1,0) FROM DayData as dd left join Almanac as al on al.date=DATE(dd.datetime) and al.date=DATE(NOW()) WHERE 1 ORDER BY dd.datetime DESC LIMIT 1" );
-       debug_printf("%s\n",SQLQUERY);
-       DoQuery(SQLQUERY);
+       log_debug("%s\n",SQLQUERY);
+       db_mysql_query(SQLQUERY);
        if ((row = mysql_fetch_row(res)))  //if there is a result, update the row
        {
           if( atoi( (char *)row[0] ) == 1 ) light=0;
@@ -1167,7 +1171,7 @@ ReadStream( ConfType * conf, int * s, unsigned char * stream, int * streamlen, u
    int  i, j=0;
 
    (*togo)=ConvertStreamtoInt( stream+43, 2, togo );
-   debug_printf( "togo=%d\n", (*togo) );
+   log_debug( "togo=%d\n", (*togo) );
    i=59; //Initial position of data stream
    (*datalen)=0;
    datalist=(unsigned char *)malloc(sizeof(char));
@@ -1636,10 +1640,37 @@ int main(int argc, char **argv)
       float  current_value;
    } *archdatalist;
 
+
+
     char sunrise_time[6],sunset_time[6];
    
     CURL *curl;
     CURLcode result;
+
+    /* Enable Logging */
+    log_init();
+
+
+    /** Inizialize Bluetooth Inverter **/
+    struct bluetooth_inverter inv={0};
+
+    strcpy(inv.macaddr,"00:80:25:22:C6:3B");
+
+    in_bluetooth_connect(&inv);
+
+    in_smadata2plus_connect(&inv);
+
+    struct smadata2_l1_packet p= { 0};
+
+    while (1){
+    	in_smadata2plus_level1_packet_read(&inv,&p);
+    }
+
+    close (inv.socket_fd);
+
+    exit(0);
+
+
 
     memset(received,0,1024);	// mit 0 initialisieren
     last_sent = (unsigned  char *)malloc( sizeof( unsigned char ));
@@ -1647,27 +1678,27 @@ int main(int argc, char **argv)
     reporttime = time(NULL);  //get time in seconds since epoch (1/1/1970)	
    
     // set config to defaults
-    debug_printf("Set default config\n");
+    log_debug("Set default config\n");
     InitConfig( &conf, datefrom, dateto );
     // read command arguments needed so we can get config from config files
-    debug_printf("Read config from command Line\n");
+    log_debug("Read config from command Line\n");
     if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost, &test, &install, &update ) < 0 )
         exit(0);
     // read config from config file
-    debug_printf("Read config from config File.\n");
+    log_debug("Read config from config File.\n");
     if( GetConfig( &conf ) < 0 )
         exit(-1);
     // read command arguments  again - they overide config of config file
-    debug_printf("Override config from command line.\n");
+    log_debug("Override config from command line.\n");
     if( ReadCommandConfig( &conf, argc, argv, datefrom, dateto, &verbose, &debug, &repost, &test, &install, &update ) < 0 )
         exit(0);
    
     // read Inverter Setting file
-    debug_printf("Read Inverter Settings File.\n");
+    log_debug("Read Inverter Settings File.\n");
     if( GetInverterSetting( &conf ) < 0 )
         exit(-1);
     // set switches used through the program
-    debug_printf("Parse ascii config and set switches.\n");
+    log_debug("Parse ascii config and set switches.\n");
     SetSwitches( &conf, datefrom, dateto, &location, &mysql, &post, &file, &daterange, &test );
     if(( install==1 )&&( mysql==1 ))	// When --INSTALL switch is set and config for mysql is complete try to install DB tables
     {
@@ -1688,7 +1719,7 @@ int main(int argc, char **argv)
        if( ! todays_almanac( &conf ) ) {
            sprintf( sunrise_time, "%s", sunrise(conf.latitude_f,conf.longitude_f ));
            sprintf( sunset_time, "%s", sunset(conf.latitude_f, conf.longitude_f ));
-           verbose_printf( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
+           log_verbose( "sunrise=%s sunset=%s\n", sunrise_time, sunset_time );
            update_almanac(  &conf, sunrise_time, sunset_time );
         }
     }
@@ -1698,11 +1729,11 @@ int main(int argc, char **argv)
     if(daterange==0 ) //auto set the dates
         auto_set_dates( &conf, &daterange, mysql, datefrom, dateto );
     else
-        verbose_printf( "QUERY RANGE    from %s to %s\n", datefrom, dateto );
+        log_verbose( "QUERY RANGE    from %s to %s\n", datefrom, dateto );
 
     if(( daterange==1 )&&((location=0)||(mysql==0)||is_light( &conf )))
     {
-	verbose_printf("SMA Address %s\n",conf.BTAddress);
+	log_verbose("SMA Address %s\n",conf.BTAddress);
 
         if (file ==1) {
 	  if(( fp=fopen(conf.File,"r")) == (FILE *)NULL ) {
@@ -1722,8 +1753,8 @@ int main(int argc, char **argv)
       str2ba( conf.BTAddress, &addr.rc_bdaddr );
 
       // connect to server
-      debug_printf("Try to connect to SMA inverter via bluetooth.\n" );
-      debug_printf("datefrom=%s dateto=%s\n", datefrom, dateto );
+      log_debug("Try to connect to SMA inverter via bluetooth.\n" );
+      log_debug("datefrom=%s dateto=%s\n", datefrom, dateto );
       status = connect(s, (struct sockaddr *)&addr, sizeof(addr));
       if (status <0){
           printf("Error connecting to %s\n", conf.BTAddress);
@@ -1742,17 +1773,17 @@ int main(int argc, char **argv)
    for( i=4; i>=0; i-- ) {
      address[i] = conv(strtok(NULL,":"));
    }
-   debug_printf("conf address %X:%X:%X:%X:%X:%X\n", address[0], address[1], address[2], address[3], address[4], address[5]);
+   log_debug("conf address %X:%X:%X:%X:%X:%X\n", address[0], address[1], address[2], address[3], address[4], address[5]);
 
    // Read from sma.in... File
    while (!feof(fp)){	
         start:
 	if (fgets(line,400,fp) != NULL){				//read line from sma.in.new
-		debug_printf("%s", line);
+		log_debug("%s", line);
 		linenum++;
 		lineread = strtok(line," ;");
 		if(!strcmp(lineread,"R")){		//See if line is something we need to receive
-			debug_printf("[%d] %s Waiting for string\n",linenum, debugdate());
+			log_debug("[%d] %s Waiting for string\n",linenum, debugdate());
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -1791,6 +1822,7 @@ int main(int argc, char **argv)
 				default :
 				fl[cc] = conv(lineread);
 				cc++;
+				break;
 				}
 
 			} while (strcmp(lineread,"$END"));
@@ -1800,7 +1832,7 @@ int main(int argc, char **argv)
 			   printf("\n\n");
 			}
 
-			debug_printf("[%d] %s Waiting for data on rfcomm\n", linenum, debugdate());
+			log_debug("[%d] %s Waiting for data on rfcomm\n", linenum, debugdate());
 			found = 0;
 			do {
                             if( already_read == 0 )
@@ -1834,9 +1866,9 @@ int main(int argc, char **argv)
                            
 			      if (memcmp(fl+4,received+4,cc-4) == 0){
 				  found = 1;
-				  debug_printf("[%d] %s Found string we are waiting for\n",linenum, debugdate()); 
+				  log_debug("[%d] %s Found string we are waiting for\n",linenum, debugdate());
 			      } else {
-				  debug_printf("[%d] %s Did not find string\n", linenum,debugdate()); 
+				  log_debug("[%d] %s Did not find string\n", linenum,debugdate());
 			      }
                             }
 			} while (found == 0);
@@ -1846,7 +1878,7 @@ int main(int argc, char **argv)
 			}
 		}
 		if(!strcmp(lineread,"S")){		//See if line is something we need to send
-			debug_printf("[%d] %s Sending\n", linenum,debugdate());
+			log_debug("[%d] %s Sending\n", linenum,debugdate());
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -1938,7 +1970,7 @@ int main(int argc, char **argv)
                                 if( daterange == 1 ) {
                                     if( strptime( datefrom, "%Y-%m-%d %H:%M:%S", &tm) == 0 ) 
                                     {
-                                        debug_printf( "datefrom %s\n", datefrom );
+                                        log_debug( "datefrom %s\n", datefrom );
                                         printf( "Time Coversion Error\n" );
                                         error=1;
                                         exit(-1);
@@ -1972,7 +2004,7 @@ int main(int argc, char **argv)
                                 if( daterange == 1 ) {
                                     if( strptime( dateto, "%Y-%m-%d %H:%M:%S", &tm) == 0 ) 
                                     {
-                                        debug_printf( "dateto %s\n", dateto );
+                                        log_debug( "dateto %s\n", dateto );
                                         printf( "Time Coversion Error\n" );
                                         error=1;
                                         exit(-1);
@@ -2104,6 +2136,7 @@ int main(int argc, char **argv)
 				default :
 				fl[cc] = conv(lineread);
 				cc++;
+				break;
 				}
 
 			} while (strcmp(lineread,"$END"));
@@ -2129,7 +2162,7 @@ int main(int argc, char **argv)
 
 
 		if(!strcmp(lineread,"E")){		//See if line is something we need to extract
-			debug_printf("[%d] %s Extracting\n", linenum, debugdate());
+			log_debug("[%d] %s Extracting\n", linenum, debugdate());
 			cc = 0;
 			do{
 				lineread = strtok(NULL," ;");
@@ -2149,7 +2182,7 @@ int main(int argc, char **argv)
                                 serial[2]=data[18];
                                 serial[1]=data[17];
                                 serial[0]=data[16];
-			        verbose_printf( "serial=%02x:%02x:%02x:%02x\n",serial[3]&0xff,serial[2]&0xff,serial[1]&0xff,serial[0]&0xff ); 
+			        log_verbose( "serial=%02x:%02x:%02x:%02x\n",serial[3]&0xff,serial[2]&0xff,serial[1]&0xff,serial[0]&0xff );
                                 free( data );
                                 break;
                                 
@@ -2215,24 +2248,24 @@ int main(int argc, char **argv)
 
 				case 7: // extract 2nd address
 				memcpy(address2,received+26,6);
-				debug_printf("address 2 %x:%x:%x:%x:%x:%x\n", address2[0], address2[1], address2[2], address2[3], address2[4], address2[5]);
+				log_debug("address 2 %x:%x:%x:%x:%x:%x\n", address2[0], address2[1], address2[2], address2[3], address2[4], address2[5]);
 				break;
 				
 				case 8: // extract bluetooth channel
 				memcpy(chan,received+22,1);
-				debug_printf("Bluetooth channel = %i\n",chan[0]);
+				log_debug("Bluetooth channel = %i\n",chan[0]);
 				break;
 
 				case 12: // extract time strings $TIMESTRING
                                 if(( received[60] == 0x6d )&&( received[61] == 0x23 ))
                                 {
 				    memcpy(timestr,received+63,24);
-				    debug_printf("extracting timestring\n");
+				    log_debug("extracting timestring\n");
                                     memcpy(timeset,received+79,4);
                                     idate=ConvertStreamtoTime( received+63,4, &idate );
                                     /* Allow delay for inverter to be slow */
                                     if( reporttime > idate ) {
-                                       debug_printf( "delay=%d\n", (int)(reporttime-idate) );
+                                       log_debug( "delay=%d\n", (int)(reporttime-idate) );
                                        //sleep( reporttime - idate );
                                        sleep(5);    //was sleeping for > 1min excessive
                                     }
@@ -2240,7 +2273,7 @@ int main(int argc, char **argv)
                                 else
                                 {
 				    memcpy(timestr,received+63,24);
-				    debug_printf("bad extracting timestring\n");
+				    log_debug("bad extracting timestring\n");
                                     already_read=0;
                                     fseek( fp, returnpos, 0 );
                                     linenum = returnline;
@@ -2274,7 +2307,7 @@ int main(int argc, char **argv)
                                     data = ReadStream( &conf, &s, received, &rr, data, &datalen, last_sent, cc, &terminated, &togo );
 
 				    if( isSMA2plusPackage(received, sizeof(received), debug) == TRUE ) {
-				      debug_printf("SMA2+ Package found -> break ARCHIVEDATA1\n");
+				      log_debug("SMA2+ Package found -> break ARCHIVEDATA1\n");
 				      free( data);
 				      goto start;
 				    }
@@ -2347,16 +2380,16 @@ int main(int argc, char **argv)
 				case 20: // SIGNAL signal strength
                           
 				strength  = (received[22] * 100.0)/0xff;
-	                        verbose_printf("bluetooth signal = %.0f%%\n",strength);
+	                        log_verbose("bluetooth signal = %.0f%%\n",strength);
                                 break;		
 				case 22: // extract time strings $INVCODE
 				invcode=received[22];
-				debug_printf("extracting invcode=%02x\n", invcode);
+				log_debug("extracting invcode=%02x\n", invcode);
                                 
 				break;
 				case 24: // Inverter data $INVERTERDATA
                                 data = ReadStream( &conf, &s, received, &rr, data, &datalen, last_sent, cc, &terminated, &togo );
-                                debug_printf( "data=%02x\n",(data+3)[0] );
+                                log_debug( "data=%02x\n",(data+3)[0] );
                                 if( (data+3)[0] == 0x08 )
                                     gap = 40; 
                                 if( (data+3)[0] == 0x10 )
@@ -2427,12 +2460,12 @@ int main(int argc, char **argv)
 
     if ((mysql ==1)&&(error==0)){
 	/* Connect to database */
-        OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
+        db_mysql_open_db( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
         for( i=1; i<archdatalen; i++ ) //Start at 1 as the first record is a dummy
         {
 	    sprintf(SQLQUERY,"INSERT INTO DayData ( DateTime, Inverter, Serial, CurrentPower, EtotalToday ) VALUES ( FROM_UNIXTIME(%ld),\'%s\',%ld,%0.f, %.3f ) ON DUPLICATE KEY UPDATE DateTime=Datetime, Inverter=VALUES(Inverter), Serial=VALUES(Serial), CurrentPower=VALUES(CurrentPower), EtotalToday=VALUES(EtotalToday)",(archdatalist+i)->date, (archdatalist+i)->inverter, (archdatalist+i)->serial, (archdatalist+i)->current_value, (archdatalist+i)->accum_value );
-	    debug_printf("%s\n",SQLQUERY);
-	    DoQuery(SQLQUERY);
+	    log_debug("%s\n",SQLQUERY);
+	    db_mysql_query(SQLQUERY);
         }
         mysql_close(conn);
     }
@@ -2451,12 +2484,12 @@ int main(int argc, char **argv)
         int	batch_count = 0;
         
         /* Connect to database */
-        OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
+        db_mysql_open_db( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
         /*
         //Get Start of day value
         sprintf(SQLQUERY,"SELECT EtotalToday FROM DayData WHERE DateTime=DATE_FORMAT( NOW(), \"%%Y%%m%%d000000\" ) " );
-        debug_printf("%s\n",SQLQUERY);
-        DoQuery(SQLQUERY);
+        log_debug("%s\n",SQLQUERY);
+        db_mysql_query(SQLQUERY);
         if (row = mysql_fetch_row(res))  //if there is a result, update the row
         {
             starttotal = atof( (char *)row[0] );
@@ -2479,12 +2512,12 @@ int main(int argc, char **argv)
                       second = loctime->tm_sec; 
 	              ret=sprintf(compurl,"%s?d=%04i%02i%02i&t=%02i:%02i&v1=%f&v2=%f&key=%s&sid=%s",conf.PVOutputURL,year,month,day,hour,minute,dtotal,(archdatalist+i)->current_value,conf.PVOutputKey,conf.PVOutputSid);
                       sprintf(SQLQUERY,"SELECT PVOutput FROM DayData WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  and PVOutput IS NOT NULL", year, month, day, hour, minute, second );
-                      debug_printf("%s\n",SQLQUERY);
-                      DoQuery(SQLQUERY);
-	              debug_printf("url = %s\n",compurl); 
+                      log_debug("%s\n",SQLQUERY);
+                      db_mysql_query(SQLQUERY);
+	              log_debug("url = %s\n",compurl);
                       if (row = mysql_fetch_row(res))  //if there is a result, already done
                       {
-	                 verbose_printf("Already Updated\n");
+	                 	("Already Updated\n");
                       }
                       else
                       {
@@ -2494,13 +2527,13 @@ int main(int argc, char **argv)
 		             curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		             curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 		             result = curl_easy_perform(curl);
-	                     debug_printf("result = %d\n",result);
+	                     log_debug("result = %d\n",result);
 		             curl_easy_cleanup(curl);
                              if( result==0 ) 
                              {
                                 sprintf(SQLQUERY,"UPDATE DayData  set PVOutput=NOW() WHERE DateTime=\"%i%02i%02i%02i%02i%02i\"  ", year, month, day, hour, minute, second );
-                                debug_printf("%s\n",SQLQUERY);
-                                DoQuery(SQLQUERY);
+                                log_debug("%s\n",SQLQUERY);
+                                db_mysql_query(SQLQUERY);
                              }
                              else
                                 break;
@@ -2513,28 +2546,28 @@ int main(int argc, char **argv)
             else  //Use batch mode 30 values at a time!
             */
         sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y-%%m-%%d 00:00:00\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 13 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC" );
-        debug_printf("%s\n",SQLQUERY);
-        DoQuery(SQLQUERY);
+        log_debug("%s\n",SQLQUERY);
+        db_mysql_query(SQLQUERY);
         batch_count=0;
         if( mysql_num_rows(res) == 1 )
         {
             if ((row = mysql_fetch_row(res)))  //Need to update these
             {
 	        sprintf(compurl,"%s?d=%s&t=%s&v1=%s&v2=%s&key=%s&sid=%s",conf.PVOutputURL,row[0],row[1],row[2],row[3],conf.PVOutputKey,conf.PVOutputSid);
-	        debug_printf("url = %s\n",compurl); 
+	        log_debug("url = %s\n",compurl);
                 {
 	            curl = curl_easy_init();
 	            if (curl){
 	                curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		        curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 		        result = curl_easy_perform(curl);
-	                debug_printf("result = %d\n",result);
+	                log_debug("result = %d\n",result);
 		        curl_easy_cleanup(curl);
                         if( result==0 ) 
                         {
                             sprintf(SQLQUERY,"UPDATE DayData  set PVOutput=NOW() WHERE DateTime=\"%s\"  ", row[4] );
-                            debug_printf("%s\n",SQLQUERY);
-                            DoQuery(SQLQUERY);
+                            log_debug("%s\n",SQLQUERY);
+                            db_mysql_query(SQLQUERY);
                         }
 	            }
                 }
@@ -2555,23 +2588,23 @@ int main(int argc, char **argv)
 	            curl = curl_easy_init();
 	            if (curl){
 	                sprintf(compurl,"http://pvoutput.org/service/r2/addbatchstatus.jsp?data=%s&key=%s&sid=%s",batch_string,conf.PVOutputKey,conf.PVOutputSid);
-	                debug_printf("url = %s\n",compurl); 
+	                log_debug("url = %s\n",compurl);
 	                curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		        curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 		        result = curl_easy_perform(curl);
                         sleep(1);
-	                debug_printf("result = %d\n",result);
+	                log_debug("result = %d\n",result);
 		        curl_easy_cleanup(curl);
                         if( result==0 ) 
                         {
                            sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y-%%m-%%d 00:00:00\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 14 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC limit %d", batch_count );
-                           debug_printf("%s\n",SQLQUERY);
-                           DoQuery1(SQLQUERY);
+                           log_debug("%s\n",SQLQUERY);
+                           db_mysql_query1(SQLQUERY);
                            while ((row1 = mysql_fetch_row(res1)))  //Need to update these
                            {
                                sprintf(SQLQUERY,"UPDATE DayData set PVOutput=NOW() WHERE DateTime=\"%s\"  ", row1[4] );
-                               debug_printf("%s\n",SQLQUERY);
-                               DoQuery2(SQLQUERY);
+                               log_debug("%s\n",SQLQUERY);
+                               db_mysql_query2(SQLQUERY);
                            }
                            mysql_free_result( res1 );
                         }
@@ -2587,23 +2620,23 @@ int main(int argc, char **argv)
 	        curl = curl_easy_init();
 	        if (curl){
 	            sprintf(compurl,"http://pvoutput.org/service/r2/addbatchstatus.jsp?data=%s&key=%s&sid=%s",batch_string,conf.PVOutputKey,conf.PVOutputSid);
-	            debug_printf("url = %s\n",compurl); 
+	            log_debug("url = %s\n",compurl);
 	            curl_easy_setopt(curl, CURLOPT_URL, compurl);
 	            curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 	            result = curl_easy_perform(curl);
                     sleep(1);
-	            debug_printf("result = %d\n",result);
+	            log_debug("result = %d\n",result);
 		    curl_easy_cleanup(curl);
                     if( result==0 ) 
                     {
                        sprintf(SQLQUERY,"SELECT DATE_FORMAT(dd1.DateTime,\'%%Y%%m%%d\'), DATE_FORMAT(dd1.DateTime,\'%%H:%%i\'), ROUND((dd1.ETotalToday-dd2.EtotalToday)*1000), dd1.CurrentPower, dd1.DateTime FROM DayData as dd1 join DayData as dd2 on dd2.DateTime=DATE_FORMAT(dd1.DateTime,\'%%Y-%%m-%%d 00:00:00\') WHERE dd1.DateTime>=Date_Sub(CURDATE(),INTERVAL 1 DAY) and dd1.PVOutput IS NULL and dd1.CurrentPower>0 ORDER BY dd1.DateTime ASC limit %d", batch_count );
-                       debug_printf("%s\n",SQLQUERY);
-                       DoQuery1(SQLQUERY);
+                       log_debug("%s\n",SQLQUERY);
+                       db_mysql_query1(SQLQUERY);
                        while ((row1 = mysql_fetch_row(res1)))  //Need to update these
                        {
                            sprintf(SQLQUERY,"UPDATE DayData set PVOutput=NOW() WHERE DateTime=\"%s\"  ", row1[4] );
-                           debug_printf("%s\n",SQLQUERY);
-                           DoQuery2(SQLQUERY);
+                           log_debug("%s\n",SQLQUERY);
+                           db_mysql_query2(SQLQUERY);
                        }
                        mysql_free_result( res1 );
                     }
@@ -2631,12 +2664,12 @@ if ((repost ==1)&&(error==0)){
     float power;
     
     /* Connect to database */
-    OpenMySqlDatabase( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
+    db_mysql_open_db( conf.MySqlHost, conf.MySqlUser, conf.MySqlPwd, conf.MySqlDatabase );
     //Get Start of day value
     starttotal = 0;
     sprintf(SQLQUERY,"SELECT DATE_FORMAT( dt1.DateTime, \"%%Y%%m%%d\" ), round((dt1.ETotalToday*1000-dt2.ETotalToday*1000),0) FROM DayData as dt1 join DayData as dt2 on dt2.DateTime = DATE_SUB( dt1.DateTime, interval 1 day ) WHERE dt1.DateTime LIKE \"%%-%%-%% 23:55:00\" ORDER BY dt1.DateTime DESC" );
-    debug_printf("%s\n",SQLQUERY);
-    DoQuery(SQLQUERY);
+    log_debug("%s\n",SQLQUERY);
+    db_mysql_query(SQLQUERY);
     while(( row = mysql_fetch_row(res) ))  //if there is a result, update the row
     {
         fp=fopen( "/tmp/curl_output", "w+" );
@@ -2651,7 +2684,7 @@ if ((repost ==1)&&(error==0)){
 	     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
 	     //curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 	     result = curl_easy_perform(curl);
-             debug_printf("result = %d\n",result);
+             log_debug("result = %d\n",result);
              rewind( fp );
              fgets( buf, sizeof( buf ), fp );
              result = sscanf( buf, "Bad request %s has no outputs between the requested period", buf1 );
@@ -2678,18 +2711,18 @@ if ((repost ==1)&&(error==0)){
                  curl = curl_easy_init();
                  if (curl){
 	            ret=sprintf(compurl,"http://pvoutput.org/service/r2/addoutput.jsp?d=%s&g=%f&key=%s&sid=%s",row[0],dtotal,conf.PVOutputKey,conf.PVOutputSid);
-                    debug_printf("url = %s\n",compurl);
+                    log_debug("url = %s\n",compurl);
 		    curl_easy_setopt(curl, CURLOPT_URL, compurl);
 		    curl_easy_setopt(curl, CURLOPT_FAILONERROR, compurl);
 		    result = curl_easy_perform(curl);
                     sleep(1);
-	            debug_printf("result = %d\n",result);
+	            log_debug("result = %d\n",result);
 		    curl_easy_cleanup(curl);
                     if( result==0 ) 
                     {
                         sprintf(SQLQUERY,"UPDATE DayData set PVOutput=NOW() WHERE DateTime=\"%s235500\"  ", row[0] );
-                        debug_printf("%s\n",SQLQUERY);
-                        //DoQuery(SQLQUERY);
+                        log_debug("%s\n",SQLQUERY);
+                        //db_mysql_query(SQLQUERY);
                     }
                     else
                         break;

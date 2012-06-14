@@ -1,11 +1,11 @@
-#include "mysql.h"
+#include "db_mysql.h"
 
 MYSQL *conn;
 MYSQL_RES *res;
 MYSQL_RES *res1;
 MYSQL_RES *res2;
 
-void OpenMySqlDatabase (char *server, char *user, char *password, char *database)
+void db_mysql_open_db (char *server, char *user, char *password, char *database)
 {
    conn = mysql_init(NULL);
    /* Connect to database */
@@ -16,7 +16,7 @@ void OpenMySqlDatabase (char *server, char *user, char *password, char *database
    }
 }
 
-void CloseMySqlDatabase()
+void db_mysql_close_db()
 {
    /* Release memory used to store results and close connection */
    mysql_free_result(res);
@@ -25,7 +25,7 @@ void CloseMySqlDatabase()
    mysql_close(conn);
 }
 
-int DoQuery (char query[1000])
+int db_mysql_query (char query[1000])
 {
 	/* execute query */
 	
@@ -36,7 +36,7 @@ int DoQuery (char query[1000])
 	return *mysql_error(conn);
 }
 
-int DoQuery1 (char query[1000])
+int db_mysql_query1 (char query[1000])
 {
 	/* execute query */
 	
@@ -47,7 +47,7 @@ int DoQuery1 (char query[1000])
 	return *mysql_error(conn);
 }
 
-int DoQuery2 (char query[1000])
+int db_mysql_query2 (char query[1000])
 {
 	/* execute query */
 	

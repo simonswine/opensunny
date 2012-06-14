@@ -1,23 +1,21 @@
-CC=gcc
-HEADER=smatool.h mysql.h
-OBJ=smatool.o mysql.o
-LDFLAGS=-L/usr/lib64/mysql
-#LDFLAGS=-L/opt/lib/mysql
-LIBS=-lbluetooth -lcurl -lmysqlclient
-CFLAGS=-g -Wall
-# -E
+CFLAGS      +=-ggdb -Wall -pedantic -std=gnu99
+LDFLAGS     += -lbluetooth -lm -lcurl -lmysqlclient
 
-smatool: $(OBJ) $(HEADER)
-	gcc $(LDFLAGS) $(LIBS) $(CFLAGS) -o $@ $(OBJ)
+all: smatool
+
+OBJS=smatool.o in_bluetooth.o in_smadata2plus.o db_mysql.o utils.o logging.o iniparser.o dictionary.o
+
+HEADER=smatool.h logging.h
+
+
+smatool: ${OBJS}
+	${CC} ${CFLAGS} -o smatool ${OBJS} ${LDFLAGS}
 
 %.o: %.c ${HEADER}
 	$(CC) ${CFLAGS} ${INCLUDES} -c -o $@ $<
-
+	
 clean:
-	rm smatool *.o *~
+	rm -f smatool *.o
 
-refresh:
-	hg pull https://code.google.com/p/sma-bluetooth/
+all: smatool
 
-diff:
-	hg diff
