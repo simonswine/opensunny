@@ -49,6 +49,79 @@ static u_int16_t SMADATA2PLUS_L2_FCSTAB[256] = { 0x0000, 0x1189, 0x2312, 0x329b,
 		0x0e70, 0x1ff9, 0xf78f, 0xe606, 0xd49d, 0xc514, 0xb1ab, 0xa022, 0x92b9,
 		0x8330, 0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78 };
 
+/* Define Value Structs */
+//int SMADATA2PLUS_VALUES_LEN = 0;
+//struct smadata2_value *SMADATA2PLUS_VALUES[SMADATA2PLUS_MAX_VALUES];
+struct smadata2_value SMADATA2PLUS_VALUES[] = {
+	/* Power AC */
+	{
+			"power_ac", 	/* Value name */
+			"W",			/* Unit */
+			1.0,			/* Factor */
+			0L,				/* Actual Value */
+			0,				/* Timestamp */
+			0x09,			/* Query ctrl1 */
+			0xa1,			/* Query ctrl2 */
+			0x00,			/* ArchCD */
+			0x00,			/* Zero */
+			0x00,			/* C */
+							/* Query Content */
+			{ 0x80, 0x00, 0x02, 0x00, 0x51, 0x00, 0x3f, 0x26, 0x00, 0xFF, 0x3f, 0x26, 0x00, 0x0e },
+			14,				/* Query Content Length */
+			0x10,			/* Response ctrl1 */
+			0x90,			/* Response ctrl2 */
+			20,				/* Value Pos */
+			4,				/* Value Len */
+			16,				/* Timestamp Pos */
+	},
+	/* Yield in inverterlifetime */
+	{
+			"yield_total", 	/* Value name */
+			"kWh",			/* Unit */
+			0.001,			/* Factor */
+			0L,				/* Actual Value */
+			0,				/* Timestamp */
+			0x09,			/* Query ctrl1 */
+			0xa0,			/* Query ctrl2 */
+			0x00,			/* ArchCD */
+			0x00,			/* Zero */
+			0x00,			/* C */
+							/* Query Content */
+			{ 0x80, 0x00, 0x02, 0x00, 0x54, 0x00, 0x01, 0x26, 0x00, 0xFF, 0x01, 0x26, 0x00 },
+			13,				/* Query Content Length */
+			0x0d,			/* Response ctrl1 */
+			0x90,			/* Response ctrl2 */
+			20,				/* Value Pos */
+			8,				/* Value Len */
+			16				/* Timestamp Pos */
+	},
+	/* DC site tests*/
+	{
+			"dc_stuff", 	/* Value name */
+			"??",		/* Unit */
+			1.0,			/* Factor */
+			0L,				/* Actual Value */
+			0,				/* Timestamp */
+			0x09,			/* Query ctrl1 */
+			0xe0,			/* Query ctrl2 */
+			0x00,			/* ArchCD */
+			0x00,			/* Zero */
+			0x00,			/* C */
+							/* Query Content */
+							{0x80, 0x00, 0x02, 0x00, 0x70, 0x70, 0x28, 0xdb, 0x4f, 0x78, 0x2f, 0xdb, 0x4f},
+/* Somtimes answer 			{ 0x80, 0x0c, 0x00, 0xfd, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00 },*/
+			13,				/* Query Content Length */
+			0x0d,			/* Response ctrl1 */
+			0x90,			/* Response ctrl2 */
+			20,				/* Value Pos */
+			4,				/* Value Len */
+			16				/* Timestamp Pos */
+	},
+
+	//
+
+};
+
 /* Print level1 packet from its struct */
 void in_smadata2plus_level1_packet_print(char * output,
 		struct smadata2_l1_packet *p) {
@@ -70,7 +143,7 @@ void in_smadata2plus_level2_packet_print(char * output,
 		struct smadata2_l2_packet *p) {
 
 	/* for output */
-	char content_hex[p->content_length*3];
+	char content_hex[p->content_length * 3];
 	buffer_hex_dump(content_hex, p->content, p->content_length);
 
 	sprintf(output,
@@ -82,7 +155,7 @@ void in_smadata2plus_level2_packet_print(char * output,
 
 /* Read level1 packet from stream */
 int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
-		struct smadata2_l1_packet *p) {
+		struct smadata2_l1_packet *p,struct smadata2_l2_packet *p2) {
 
 	/* wait for start package */
 	while (in_bluetooth_get_byte(inv) != SMADATA2PLUS_STARTBYTE) {
@@ -102,6 +175,7 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 	in_bluetooth_get_bytes(inv, p->src, 6);
 	in_bluetooth_get_bytes(inv, p->dest, 6);
 
+
 	/* reverse byte order */
 	buffer_reverse(p->src, 6);
 	buffer_reverse(p->dest, 6);
@@ -111,6 +185,8 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 
 	/* packet_len */
 	p->length = len1 + (len2 * 256);
+
+	printf("\nLengths len1=%d len2=%d len=%d\n",len1,len2,p->length);
 
 	/* getcontent */
 	in_bluetooth_get_bytes(inv, p->content,
@@ -127,9 +203,9 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 			&& p->content[0] == SMADATA2PLUS_STARTBYTE
 			&& memcmp(p->content + 1, SMADATA2PLUS_L2_HEADER, 4) == 0) {
 
-		struct smadata2_l2_packet pl2 = {0};
-		in_smadata2plus_level2_packet_read(p->content,
-				p->length - SMADATA2PLUS_L1_HEADER_LEN, &pl2);
+		if (p2 != NULL)
+			in_smadata2plus_level2_packet_read(p->content,
+				p->length - SMADATA2PLUS_L1_HEADER_LEN, p2);
 
 	}
 
@@ -140,70 +216,73 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 void in_smadata2plus_level2_packet_read(unsigned char *buffer, int len,
 		struct smadata2_l2_packet *p) {
 
-	int pos=0;
+	int pos = 0;
 
 	/* Strip escapes */
 	int len_bef = len;
 	in_smadata2plus_level2_strip_escapes(buffer, &len);
-	int diff = len_bef- len;
+	int diff = len_bef - len;
 
 	/* Remove checksum */
 	len -= 1;
 	unsigned char checksum[2], checksum_recv[2];
-	checksum_recv[1] = buffer[(len--)-1];
-	checksum_recv[0] = buffer[(len--)-1];
+	checksum_recv[1] = buffer[(len--) - 1];
+	checksum_recv[0] = buffer[(len--) - 1];
 
 	/* Generate checksum */
-	in_smadata2plus_tryfcs16(buffer + 1, len-1, checksum);
+	in_smadata2plus_level2_tryfcs16(buffer + 1, len - 1, checksum);
 
 	/* Log */
-	log_debug("[L2] Unescaped %d chars, checksum %02x:%02x==%02x:%02x  ", diff, checksum[0], checksum[1],checksum_recv[0], checksum_recv[1]);
+	log_debug(
+			"[L2] Unescaped %d chars, checksum %02x:%02x==%02x:%02x  ", diff, checksum[0], checksum[1], checksum_recv[0], checksum_recv[1]);
 
 	/* Compare checksums */
 	if (memcmp(checksum, checksum_recv, 2) != 0) {
 		log_info("[L2] Received packet with wrong Checksum");
+	} else {
+
+		/*** Start Reading of packet ***/
+
+		/* Start byte */
+		pos++;
+
+		/* header bytes */
+		pos += sizeof(SMADATA2PLUS_L2_HEADER);
+
+		/* Ctrl codes */
+		p->ctrl1 = buffer[pos++];
+		p->ctrl2 = buffer[pos++];
+
+		/* Address style */
+		pos += 6;
+
+		/* ArchCd and zero */
+		p->archcd = buffer[pos++];
+		p->zero = buffer[pos++];
+
+		/* Address style again (invertercode) */
+		pos += 6;
+
+		/* zero and  c */
+		pos++;
+		p->c = buffer[pos++];
+
+		/* four zeros */
+		pos += 4;
+
+		/* packetcount */
+		pos += 2;
+
+		/* content */
+		p->content_length = len - pos;
+		memcpy(p->content, buffer + pos, p->content_length);
+
+		/* Packet print */
+		char output[BUFSIZ];
+		in_smadata2plus_level2_packet_print(output, p);
+		log_debug("[L2] Received packet with  %s", output);
+
 	}
-
-	/*** Start Reading of packet ***/
-
-	/* Start byte */
-	pos++;
-
-	/* header bytes */
-	pos += sizeof(SMADATA2PLUS_L2_HEADER);
-
-	/* Ctrl codes */
-	p->ctrl1 = buffer[pos++];
-	p->ctrl2 = buffer[pos++];
-
-	/* Address style */
-	pos += 6;
-
-	/* ArchCd and zero */
-	p->archcd = buffer[pos++];
- 	p->zero = buffer[pos++];
-
-	/* Address style again (invertercode) */
-	pos += 6;
-
-	/* zero and  c */
-	pos++;
-	p->c = buffer[pos++];
-
-	/* four zeros */
-	pos += 4;
-
-	/* packetcount */
-	pos += 2;
-
-	/* content */
-	p-> content_length = len - pos;
-    memcpy(p->content,buffer+pos,p->content_length);
-
-	/* Packet print */
-	char output[BUFSIZ];
-	in_smadata2plus_level2_packet_print(output, p);
-	log_debug("[L2] Received packet with  %s", output);
 
 }
 
@@ -253,7 +332,7 @@ int in_smadata2plus_level2_packet_gen(struct bluetooth_inverter *inv,
 	len += 4;
 
 	/* packetcount */
-	buffer[len++] = inv->l2_packet_send_count;
+	buffer[len++] = inv->l2_packet_send_count++;
 
 	/* adding content */
 	memcpy(buffer + len, p->content, p->content_length);
@@ -261,7 +340,7 @@ int in_smadata2plus_level2_packet_gen(struct bluetooth_inverter *inv,
 
 	/* build checksum of content */
 	unsigned char checksum[2];
-	in_smadata2plus_tryfcs16(buffer + 1, len - 1, checksum);
+	in_smadata2plus_level2_tryfcs16(buffer + 1, len - 1, checksum);
 
 	/* Escape special chars */
 	int len_bef = len;
@@ -271,13 +350,11 @@ int in_smadata2plus_level2_packet_gen(struct bluetooth_inverter *inv,
 	int checksum_len = 2;
 	memcpy(buffer + len, checksum, 2);
 	/* Escaping checksum if needed */
-	in_smadata2plus_level2_add_escapes(buffer+len, &checksum_len);
+	in_smadata2plus_level2_add_escapes(buffer + len, &checksum_len);
 	len += checksum_len;
 
 	log_debug(
 			"[L2] Escaped %d chars, checksum %02x:%02x", len-len_bef, checksum[0], checksum[1]);
-
-
 
 	/* Trailing Byte */
 	buffer[len++] = SMADATA2PLUS_STARTBYTE;
@@ -330,12 +407,12 @@ void in_smadata2plus_level1_packet_send(struct bluetooth_inverter *inv,
 }
 
 void in_smadata2plus_level1_cmdcode_wait(struct bluetooth_inverter * inv,
-		struct smadata2_l1_packet *p, int cmdcode) {
+		struct smadata2_l1_packet *p, struct smadata2_l2_packet * p2 , int cmdcode) {
 
 	log_debug("[L1] Wait for packet cmdcode == %d", cmdcode);
-	int act_cmdcode = in_smadata2plus_level1_packet_read(inv, p);
+	int act_cmdcode = in_smadata2plus_level1_packet_read(inv, p,p2);
 	while (act_cmdcode != cmdcode) {
-		act_cmdcode = in_smadata2plus_level1_packet_read(inv, p);
+		act_cmdcode = in_smadata2plus_level1_packet_read(inv, p,p2);
 	}
 	log_debug("[L1] Got packet cmdcode == %d", cmdcode);
 
@@ -359,105 +436,6 @@ void in_smadata2plus_level2_trailer(unsigned char * buffer,
 
 }
 
-void in_smadata2plus_connect(struct bluetooth_inverter * inv) {
-
-	/* Intizalize packet structs */
-	struct smadata2_l1_packet recv_pl1 = { 0 };
-	struct smadata2_l1_packet sent_pl1 = { 0 };
-	struct smadata2_l2_packet sent_pl2 = { 0 };
-
-	/* Wait for Broadcast request */
-	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,
-			SMADATA2PLUS_L1_CMDCODE_BROADCAST);
-
-	/* fetch netid from package */
-	unsigned char netid = recv_pl1.content[4];
-
-	/* Answer broadcast */
-	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_BROADCAST;
-	/* Set destination */
-	memcpy(sent_pl1.dest, recv_pl1.src, 6);
-	/* Set my address */
-	in_bluetooth_get_my_address(inv, sent_pl1.src);
-
-	int len = 0;
-	/* Copy content for Broadcast */
-	memcpy(sent_pl1.content, SMADATA2PLUS_L1_CONTENT_BROADCAST,
-			sizeof(SMADATA2PLUS_L1_CONTENT_BROADCAST));
-	len += sizeof(SMADATA2PLUS_L1_CONTENT_BROADCAST);
-	/* Set netid */
-	sent_pl1.content[4] = netid;
-
-	/* Setting length of packet */
-	sent_pl1.length = SMADATA2PLUS_L1_HEADER_LEN + len;
-
-	/* Send Packet out */
-	in_smadata2plus_level1_packet_send(inv, &sent_pl1);
-
-	/* Wait for cmdcode 10 */
-	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,
-			SMADATA2PLUS_L1_CMDCODE_10);
-
-	/* Wait for cmdcode 5 */
-	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,
-			SMADATA2PLUS_L1_CMDCODE_5);
-
-	/** Sent first L2 packet*/
-	in_smadata2plus_level1_clear(&sent_pl1);
-	in_smadata2plus_level2_clear(&sent_pl2);
-	/* Set cmdcode */
-	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
-	/* Set destination */
-	buffer_repeat(sent_pl1.dest, 0xff, 6);
-	/* Set my address */
-	in_bluetooth_get_my_address(inv, sent_pl1.src);
-	/* Set Layer 2 */
-	sent_pl2.ctrl1 = 0x09;
-	sent_pl2.ctrl2 = 0xa0;
-	/* Set L2 Content */
-	unsigned char content_packet_one[13] = { 0x80, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	memcpy(sent_pl2.content, content_packet_one, sizeof(content_packet_one));
-	sent_pl2.content_length = sizeof(content_packet_one);
-	/* Generate L2 Paket */
-	memset(sent_pl1.content, 0, BUFSIZ);
-	sent_pl1.length = in_smadata2plus_level2_packet_gen(inv, sent_pl1.content,
-			&sent_pl2);
-	sent_pl1.length += SMADATA2PLUS_L1_HEADER_LEN;
-	/* Send Packet out */
-	in_smadata2plus_level1_packet_send(inv, &sent_pl1);
-
-
-	/* Wait for cmdcode 1 */
-	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,
-			SMADATA2PLUS_L1_CMDCODE_LEVEL2);
-
-
-	/** Sent second L2 packet*/
-	in_smadata2plus_level1_clear(&sent_pl1);
-	in_smadata2plus_level2_clear(&sent_pl2);
-	/* Set cmdcode */
-	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
-	/* Set destination */
-	buffer_repeat(sent_pl1.dest, 0xff, 6);
-	/* Set my address */
-	in_bluetooth_get_my_address(inv, sent_pl1.src);
-	/* Set Layer 2 */
-	sent_pl2.ctrl1 = 0x08;
-	sent_pl2.ctrl2 = 0xa0;
-	/* Set L2 Content */
-	unsigned char content_packet_two[9] = { 0x80, 0x0E, 0x01, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-	memcpy(sent_pl2.content, content_packet_two, sizeof(content_packet_two));
-	sent_pl2.content_length = sizeof(content_packet_two);
-	/* Generate L2 Paket */
-	sent_pl1.length = in_smadata2plus_level2_packet_gen(inv, sent_pl1.content,
-			&sent_pl2);
-	sent_pl1.length += SMADATA2PLUS_L1_HEADER_LEN;
-	/* Send Packet out */
-	in_smadata2plus_level1_packet_send(inv, &sent_pl1);
-
-}
-
 /*
  * How to use the fcs
  */
@@ -466,7 +444,7 @@ void in_smadata2plus_connect(struct bluetooth_inverter * inv) {
 /*
  * Calculate a new fcs given the current fcs and the new data.
  */
-u_int16_t in_smadata2plus_pppfcs16(u_int16_t fcs, void *_cp, int len) {
+u_int16_t in_smadata2plus_level2_pppfcs16(u_int16_t fcs, void *_cp, int len) {
 	register unsigned char *cp = (unsigned char *) _cp;
 
 	while (len--)
@@ -474,14 +452,14 @@ u_int16_t in_smadata2plus_pppfcs16(u_int16_t fcs, void *_cp, int len) {
 	return (fcs);
 }
 
-void in_smadata2plus_tryfcs16(unsigned char * buffer, int len,
+void in_smadata2plus_level2_tryfcs16(unsigned char * buffer, int len,
 		unsigned char * cs) {
 	u_int16_t trialfcs;
 	unsigned char stripped[BUFSIZ] = { 0 };
 
 	memcpy(stripped, buffer, len);
 
-	trialfcs = in_smadata2plus_pppfcs16(PPPINITFCS16, stripped, len);
+	trialfcs = in_smadata2plus_level2_pppfcs16(PPPINITFCS16, stripped, len);
 	trialfcs ^= 0xffff; /* complement */
 
 	cs[0] = (trialfcs & 0x00ff); /* least significant byte first */
@@ -530,4 +508,267 @@ void in_smadata2plus_level2_strip_escapes(unsigned char *buffer, int *len) {
 			(*len)--;
 		}
 	}
+}
+
+void in_smadata2plus_connect(struct bluetooth_inverter * inv) {
+
+	/* Intizalize packet structs */
+	struct smadata2_l1_packet recv_pl1 = { 0 };
+	struct smadata2_l2_packet recv_pl2 = { 0 };
+	struct smadata2_l1_packet sent_pl1 = { 0 };
+	struct smadata2_l2_packet sent_pl2 = { 0 };
+
+	/* Wait for Broadcast request */
+	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,NULL,
+			SMADATA2PLUS_L1_CMDCODE_BROADCAST);
+
+	/* fetch netid from package */
+	unsigned char netid = recv_pl1.content[4];
+
+	/* Answer broadcast */
+	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_BROADCAST;
+	/* Set destination */
+	memcpy(sent_pl1.dest, recv_pl1.src, 6);
+	/* Set my address */
+	in_bluetooth_get_my_address(inv, sent_pl1.src);
+
+	int len = 0;
+	/* Copy content for Broadcast */
+	memcpy(sent_pl1.content, SMADATA2PLUS_L1_CONTENT_BROADCAST,
+			sizeof(SMADATA2PLUS_L1_CONTENT_BROADCAST));
+	len += sizeof(SMADATA2PLUS_L1_CONTENT_BROADCAST);
+	/* Set netid */
+	sent_pl1.content[4] = netid;
+
+	/* Setting length of packet */
+	sent_pl1.length = SMADATA2PLUS_L1_HEADER_LEN + len;
+
+	/* Send Packet out */
+	in_smadata2plus_level1_packet_send(inv, &sent_pl1);
+
+	/* Wait for cmdcode 10 */
+	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,NULL,
+			SMADATA2PLUS_L1_CMDCODE_10);
+
+	/* Wait for cmdcode 5 */
+	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,NULL,
+			SMADATA2PLUS_L1_CMDCODE_5);
+
+	/** Sent first L2 packet*/
+	in_smadata2plus_level1_clear(&sent_pl1);
+	in_smadata2plus_level2_clear(&sent_pl2);
+	/* Set cmdcode */
+	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
+	/* Set destination */
+	buffer_repeat(sent_pl1.dest, 0xff, 6);
+	/* Set my address */
+	in_bluetooth_get_my_address(inv, sent_pl1.src);
+	/* Set Layer 2 */
+	sent_pl2.ctrl1 = 0x09;
+	sent_pl2.ctrl2 = 0xa0;
+	/* Set L2 Content */
+	unsigned char content_packet_one[13] = { 0x80, 0x00, 0x02, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	memcpy(sent_pl2.content, content_packet_one, sizeof(content_packet_one));
+	sent_pl2.content_length = sizeof(content_packet_one);
+	/* Generate L2 Paket */
+	memset(sent_pl1.content, 0, BUFSIZ);
+	sent_pl1.length = in_smadata2plus_level2_packet_gen(inv, sent_pl1.content,
+			&sent_pl2);
+	sent_pl1.length += SMADATA2PLUS_L1_HEADER_LEN;
+	/* Send Packet out */
+	in_smadata2plus_level1_packet_send(inv, &sent_pl1);
+
+	/* Wait for cmdcode 1 */
+	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,&recv_pl2,
+			SMADATA2PLUS_L1_CMDCODE_LEVEL2);
+
+	/** Sent second L2 packet*/
+	in_smadata2plus_level1_clear(&sent_pl1);
+	in_smadata2plus_level2_clear(&sent_pl2);
+	/* Set cmdcode */
+	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
+	/* Set destination */
+	buffer_repeat(sent_pl1.dest, 0xff, 6);
+	/* Set my address */
+	in_bluetooth_get_my_address(inv, sent_pl1.src);
+	/* Set Layer 2 */
+	sent_pl2.ctrl1 = 0x08;
+	sent_pl2.ctrl2 = 0xa0;
+	sent_pl2.zero = 0x03;
+	sent_pl2.c = 0x03;
+	/* Set L2 Content */
+	unsigned char content_packet_two[9] = { 0x80, 0x0E, 0x01, 0xFD, 0xFF, 0xFF,
+			0xFF, 0xFF, 0xFF };
+	memcpy(sent_pl2.content, content_packet_two, sizeof(content_packet_two));
+	sent_pl2.content_length = sizeof(content_packet_two);
+	/* Generate L2 Paket */
+	sent_pl1.length = in_smadata2plus_level2_packet_gen(inv, sent_pl1.content,
+			&sent_pl2);
+	sent_pl1.length += SMADATA2PLUS_L1_HEADER_LEN;
+	/* Send Packet out */
+	in_smadata2plus_level1_packet_send(inv, &sent_pl1);
+
+}
+
+void in_smadata2plus_login(struct bluetooth_inverter * inv) {
+
+	/* Intizalize packet structs */
+	struct smadata2_l1_packet recv_pl1 = { 0 };
+	struct smadata2_l2_packet recv_pl2 = { 0 };
+	struct smadata2_l1_packet sent_pl1 = { 0 };
+	struct smadata2_l2_packet sent_pl2 = { 0 };
+
+	/** Sent second L2 login packet*/
+	in_smadata2plus_level1_clear(&sent_pl1);
+	in_smadata2plus_level2_clear(&sent_pl2);
+	/* Set cmdcode */
+	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
+	/* Set destination */
+	buffer_repeat(sent_pl1.dest, 0xff, 6);
+	/* Set my address */
+	in_bluetooth_get_my_address(inv, sent_pl1.src);
+	/* Set Layer 2 */
+	sent_pl2.ctrl1 = 0x0e;
+	sent_pl2.ctrl2 = 0xa0;
+	sent_pl2.zero = 0x01;
+	sent_pl2.c = 0x01;
+	/* Set L2 Content */
+	unsigned char content_packet_login[21] = { 0x80, 0x0C, 0x04, 0xFD, 0xFF,
+			0x07, 0x00, 0x00, 0x00, 0x84, 0x03, 0x00, 0x00, 0xaa, 0xaa, 0xbb,
+			0xbb, 0x00, 0x00, 0x00, 0x00 };
+	memcpy(sent_pl2.content, content_packet_login,
+			sizeof(content_packet_login));
+	sent_pl2.content_length = sizeof(content_packet_login);
+	/* Adding Password */
+	int i = 0, j = 0;
+	unsigned char passwd_char;
+	for (i = 0; i < 12; i++) {
+
+		/* As soon as first null byte write only null bytes */
+		if (inv->password[j] == 0x00)
+			sent_pl2.content[sent_pl2.content_length] = 0x00 + 0x88;
+		else {
+			passwd_char = inv->password[j];
+			sent_pl2.content[sent_pl2.content_length] = ((passwd_char + 0x88)
+					% 0xff);
+			j++;
+		}
+		sent_pl2.content_length++;
+	}
+
+	/* Generate L2 Paket */
+	sent_pl1.length = in_smadata2plus_level2_packet_gen(inv, sent_pl1.content,
+			&sent_pl2);
+	sent_pl1.length += SMADATA2PLUS_L1_HEADER_LEN;
+	/* Send Packet out */
+	in_smadata2plus_level1_packet_send(inv, &sent_pl1);
+
+	/* Wait for cmdcode 1 */
+	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,&recv_pl2,
+			SMADATA2PLUS_L1_CMDCODE_LEVEL2);
+
+}
+
+void in_smadata2plus_parse_value(struct smadata2_l1_packet * p1,
+		struct smadata2_l2_packet * p2, struct smadata2_value * value) {
+
+	int max = 0;
+
+	/* Search for last position in content */
+	if ((value->r_value_pos + value->r_value_len)
+			> value->r_timestamp_pos + 4) {
+		max = (value->r_value_pos + value->r_value_len);
+	} else {
+		max = value->r_timestamp_pos + 4;
+	}
+
+	/* check if matches */
+	if (p2->ctrl1 == value->r_ctrl1 && p2->ctrl2 == value->r_ctrl2
+			&& p2->content_length >= max) {
+
+		/* copy time stamp */
+		memcpy(&value->timestamp, p2->content + value->r_timestamp_pos, 4);
+		/* copy value */
+		memcpy(&value->value, p2->content + value->r_value_pos,
+				value->r_value_len);
+
+		if ((float) ((int) value->factor) == value->factor) {
+			/* Ganzzahl */
+			log_info(
+					"[Value] timestamp=%d %s=%d%s", value->timestamp, value->name, value->value, value->unit);
+
+		} else {
+			/* Float */
+			double value_double = ((double) value->value)
+					* ((double) value->factor);
+
+			/* Decide how many after decimals */
+			int after_dec_point = 0;
+			if (value->factor == 0.1)
+				after_dec_point = 1;
+			else if (value->factor == 0.01)
+				after_dec_point = 2;
+			else if (value->factor == 0.001)
+				after_dec_point = 3;
+			else
+				after_dec_point = 3;
+
+			log_info(
+					"[Value] timestamp=%d %s=%.*lf%s", value->timestamp, value->name, after_dec_point, value_double, value->unit);
+
+		}
+
+	}
+
+}
+
+void in_smadata2plus_get_values(struct bluetooth_inverter * inv) {
+
+	/* Packet Structs */
+	struct smadata2_l1_packet recv_pl1 = { 0 };
+	struct smadata2_l2_packet recv_pl2 = { 0 };
+	struct smadata2_l1_packet sent_pl1 = { 0 };
+	struct smadata2_l2_packet sent_pl2 = { 0 };
+
+	struct smadata2_value *value;
+
+	for (int value_pos = 0; value_pos <
+		(sizeof(SMADATA2PLUS_VALUES)/ sizeof(struct smadata2_value)); ++value_pos) {
+
+		value = &SMADATA2PLUS_VALUES[value_pos];
+
+		in_smadata2plus_level1_clear(&sent_pl1);
+		in_smadata2plus_level2_clear(&sent_pl2);
+		/* Set cmdcode */
+		sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
+		/* Set destination */
+		buffer_repeat(sent_pl1.dest, 0xff, 6);
+		/* Set my address */
+		in_bluetooth_get_my_address(inv, sent_pl1.src);
+		/* Set Layer 2 */
+		sent_pl2.ctrl1 = value->q_ctrl1;
+		sent_pl2.ctrl2 = value->q_ctrl2;
+		sent_pl2.archcd = value->q_archcd;
+		sent_pl2.zero = value->q_zero;
+		sent_pl2.c = value->q_c;
+		/* Set L2 Content */
+		memcpy(sent_pl2.content, value->q_content, value->q_content_length);
+		sent_pl2.content_length = value->q_content_length;
+		/* Generate L2 Paket */
+		sent_pl1.length = in_smadata2plus_level2_packet_gen(inv,
+				sent_pl1.content, &sent_pl2);
+		sent_pl1.length += SMADATA2PLUS_L1_HEADER_LEN;
+		/* Send Packet out */
+		in_smadata2plus_level1_packet_send(inv, &sent_pl1);
+
+		/* Wait for answer */
+		in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1, &recv_pl2,
+				SMADATA2PLUS_L1_CMDCODE_LEVEL2);
+
+		/* Parse L2 Content */
+		in_smadata2plus_parse_value(&recv_pl1, &recv_pl2, value);
+
+	}
+
 }

@@ -11,6 +11,7 @@
 struct bluetooth_inverter {
 	char name[32];
 	char macaddr[18];
+	unsigned char password[13];
 	int socket_fd;
 	int socket_status;
 	unsigned char buffer[BUFSIZ];

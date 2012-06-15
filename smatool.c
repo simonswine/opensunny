@@ -1656,14 +1656,24 @@ int main(int argc, char **argv)
 
     strcpy(inv.macaddr,"00:80:25:22:C6:3B");
 
+    strcpy(inv.password,"0000");
+
+
     in_bluetooth_connect(&inv);
 
     in_smadata2plus_connect(&inv);
 
+    inv.l2_packet_send_count++;
+
+    in_smadata2plus_login(&inv);
+
+    in_smadata2plus_get_values(&inv);
+
     struct smadata2_l1_packet p= { 0};
+    struct smadata2_l2_packet p2= { 0};
 
     while (1){
-    	in_smadata2plus_level1_packet_read(&inv,&p);
+    	in_smadata2plus_level1_packet_read(&inv,&p,&p2);
     }
 
     close (inv.socket_fd);
