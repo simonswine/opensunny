@@ -154,6 +154,47 @@ void in_smadata2plus_level2_packet_print(char * output,
 }
 
 /* Read level1 packet from stream */
+
+void in_smadata2plus_level1_framgment_append(struct bluetooth_inverter *inv,
+		struct smadata2_l1_packet *p){
+
+	/* wait for start package */
+	while (in_bluetooth_get_byte(inv) != SMADATA2PLUS_STARTBYTE) {
+		usleep(500);
+	}
+
+	/* Fetching Checksum */
+	unsigned char len1 = in_bluetooth_get_byte(inv);
+	unsigned char len2 = in_bluetooth_get_byte(inv);
+	unsigned char checksum = in_bluetooth_get_byte(inv);
+	unsigned char checksumvalidate = SMADATA2PLUS_STARTBYTE ^ len1 ^ len2;
+	if (checksum != checksumvalidate) {
+		log_debug("[L1] Received packet with wrong Checksum");
+	}
+
+	int len = len1 + (len2 * 256);
+
+	in_bluetooth_get_bytes(inv, NULL, 14);
+
+	in_bluetooth_get_bytes(inv, p->content + (p->length- SMADATA2PLUS_L1_HEADER_LEN),
+			len - SMADATA2PLUS_L1_HEADER_LEN);
+
+	p->length += len - SMADATA2PLUS_L1_HEADER_LEN;
+
+	/* Packet pritn */
+	char output[BUFSIZ];
+	in_smadata2plus_level1_packet_print(output, p);
+
+	log_debug("[L1] Received packet with %s", output);
+
+	if (p->content[p->length - SMADATA2PLUS_L1_HEADER_LEN-1]!= 0x7e){
+		log_debug ("[L1] Detected Fragmented Packet");
+		in_smadata2plus_level1_framgment_append(inv,p);
+	}
+
+
+}
+
 int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 		struct smadata2_l1_packet *p,struct smadata2_l2_packet *p2) {
 
@@ -203,6 +244,12 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 			&& p->content[0] == SMADATA2PLUS_STARTBYTE
 			&& memcmp(p->content + 1, SMADATA2PLUS_L2_HEADER, 4) == 0) {
 
+		/* Check if L2 Paket is fragmented */
+		if (p->content[p->length - SMADATA2PLUS_L1_HEADER_LEN-1]!= 0x7e){
+			log_debug ("[L1] Detected Fragmented Packet");
+			in_smadata2plus_level1_framgment_append(inv,p);
+		}
+		/* Check if got L2 struct */
 		if (p2 != NULL)
 			in_smadata2plus_level2_packet_read(p->content,
 				p->length - SMADATA2PLUS_L1_HEADER_LEN, p2);

@@ -1650,7 +1650,6 @@ int main(int argc, char **argv)
     /* Enable Logging */
     log_init();
 
-
     /** Inizialize Bluetooth Inverter **/
     struct bluetooth_inverter inv={0};
 

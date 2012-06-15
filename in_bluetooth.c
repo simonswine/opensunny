@@ -105,7 +105,10 @@ char in_bluetooth_get_byte(struct bluetooth_inverter * inv) {
 void in_bluetooth_get_bytes(struct bluetooth_inverter * inv,
 		unsigned char *buffer, int count) {
 	for (int i = 0; i < count; ++i) {
-		buffer[i] = in_bluetooth_get_byte(inv);
+		if (buffer == NULL)
+			in_bluetooth_get_byte(inv);
+		else
+			buffer[i] = in_bluetooth_get_byte(inv);
 	}
 }
 
