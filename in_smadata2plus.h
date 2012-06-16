@@ -14,6 +14,7 @@
 #define SMADATA2PLUS_L1_CMDCODE_LEVEL2 1		// 0x0001
 #define SMADATA2PLUS_L1_CMDCODE_BROADCAST 2  	// 0x0002
 #define SMADATA2PLUS_L1_CMDCODE_5 5  			// 0x0005
+#define SMADATA2PLUS_L1_CMDCODE_FRAGMENT 8		// 0x0008
 #define SMADATA2PLUS_L1_CMDCODE_10 10  			// 0x000a
 #define SMADATA2PLUS_L1_CMDCODE_12 12  			// 0x000c
 
@@ -41,13 +42,20 @@ struct smadata2_l2_packet {
 };
 
 /* smadata2 value */
-/* level2 packet */
 struct smadata2_value {
 	char name[64];
 	char unit[5];
 	float factor;
 	unsigned long value;
 	int timestamp;
+	int r_value_pos;
+	int r_value_len;
+	int r_timestamp_pos;
+
+};
+
+/* smadata2 query */
+struct smadata2_query {
 	unsigned char q_ctrl1;
 	unsigned char q_ctrl2;
 	unsigned char q_archcd;
@@ -57,10 +65,11 @@ struct smadata2_value {
 	int q_content_length;
 	unsigned char r_ctrl1;
 	unsigned char r_ctrl2;
-	int r_value_pos;
-	int r_value_len;
-	int r_timestamp_pos;
+	struct smadata2_value values[12];
+	int value_count;
 };
+
+
 
 void in_smadata2plus_level1_cmdcode_wait(struct bluetooth_inverter * inv,
 		struct smadata2_l1_packet *p, struct smadata2_l2_packet * p2 , int cmdcode);

@@ -50,16 +50,9 @@ static u_int16_t SMADATA2PLUS_L2_FCSTAB[256] = { 0x0000, 0x1189, 0x2312, 0x329b,
 		0x8330, 0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78 };
 
 /* Define Value Structs */
-//int SMADATA2PLUS_VALUES_LEN = 0;
-//struct smadata2_value *SMADATA2PLUS_VALUES[SMADATA2PLUS_MAX_VALUES];
-struct smadata2_value SMADATA2PLUS_VALUES[] = {
+struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 	/* Power AC */
 	{
-			"power_ac", 	/* Value name */
-			"W",			/* Unit */
-			1.0,			/* Factor */
-			0L,				/* Actual Value */
-			0,				/* Timestamp */
 			0x09,			/* Query ctrl1 */
 			0xa1,			/* Query ctrl2 */
 			0x00,			/* ArchCD */
@@ -70,17 +63,22 @@ struct smadata2_value SMADATA2PLUS_VALUES[] = {
 			14,				/* Query Content Length */
 			0x10,			/* Response ctrl1 */
 			0x90,			/* Response ctrl2 */
-			20,				/* Value Pos */
-			4,				/* Value Len */
-			16,				/* Timestamp Pos */
+			{
+					{
+						"power_ac", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						20,				/* Value Pos */
+						4,				/* Value Len */
+						16,				/* Timestamp Pos */
+					},
+			},
+			1,				/* Value Count */
 	},
 	/* Yield in inverterlifetime */
 	{
-			"yield_total", 	/* Value name */
-			"kWh",			/* Unit */
-			0.001,			/* Factor */
-			0L,				/* Actual Value */
-			0,				/* Timestamp */
 			0x09,			/* Query ctrl1 */
 			0xa0,			/* Query ctrl2 */
 			0x00,			/* ArchCD */
@@ -91,35 +89,222 @@ struct smadata2_value SMADATA2PLUS_VALUES[] = {
 			13,				/* Query Content Length */
 			0x0d,			/* Response ctrl1 */
 			0x90,			/* Response ctrl2 */
-			20,				/* Value Pos */
-			8,				/* Value Len */
-			16				/* Timestamp Pos */
+			{
+					{
+						"yield_total", 	/* Value name */
+						"kWh",			/* Unit */
+						0.001,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						20,				/* Value Pos */
+						8,				/* Value Len */
+						16,				/* Timestamp Pos */
+					},
+			},
+			1,				/* Value Count */
+
 	},
-	/* DC site tests*/
+//	/* Archive Values */
+//	{
+//			0x09,			/* Query ctrl1 */
+//			0xe0,			/* Query ctrl2 */
+//			0x00,			/* ArchCD */
+//			0x00,			/* Zero */
+//			0x00,			/* C */
+//							/* Query Content */
+//							{0x80, 0x00, 0x02, 0x00, 0x70, 0x70, 0x28, 0xdb, 0x4f, 0x78, 0x2f, 0xdb, 0x4f},
+///* Somtimes answer 			{ 0x80, 0x0c, 0x00, 0xfd, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00 },*/
+//			13,				/* Query Content Length */
+//			0x1e,			/* Response ctrl1 */
+//			0xd0,			/* Response ctrl2 */
+//			{
+//					{
+//						"unkown_1", 	/* Value name */
+//						"??",		/* Unit */
+//						1.0,			/* Factor */
+//						0L,				/* Actual Value */
+//						0,				/* Timestamp */
+//						16,				/* Value Pos */
+//						4,				/* Value Len */
+//						12				/* Timestamp Pos */
+//					},
+//					{
+//						"unkown_2", 	/* Value name */
+//						"??",		/* Unit */
+//						1.0,			/* Factor */
+//						0L,				/* Actual Value */
+//						0,				/* Timestamp */
+//						28,				/* Value Pos */
+//						4,				/* Value Len */
+//						24				/* Timestamp Pos */
+//					},
+//					{
+//						"unkown_3", 	/* Value name */
+//						"??",		/* Unit */
+//						1.0,			/* Factor */
+//						0L,				/* Actual Value */
+//						0,				/* Timestamp */
+//						40,				/* Value Pos */
+//						4,				/* Value Len */
+//						36				/* Timestamp Pos */
+//					},
+//			},
+//			3,				/* Value Count */
+//	},
+	/* DC stuff finally */
 	{
-			"dc_stuff", 	/* Value name */
-			"??",		/* Unit */
-			1.0,			/* Factor */
-			0L,				/* Actual Value */
-			0,				/* Timestamp */
-			0x09,			/* Query ctrl1 */
-			0xe0,			/* Query ctrl2 */
+			0x44,			/* Query ctrl1 */
+			0xa0,			/* Query ctrl2 */
 			0x00,			/* ArchCD */
 			0x00,			/* Zero */
 			0x00,			/* C */
 							/* Query Content */
-							{0x80, 0x00, 0x02, 0x00, 0x70, 0x70, 0x28, 0xdb, 0x4f, 0x78, 0x2f, 0xdb, 0x4f},
-/* Somtimes answer 			{ 0x80, 0x0c, 0x00, 0xfd, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00 },*/
-			13,				/* Query Content Length */
-			0x0d,			/* Response ctrl1 */
+			{0x80, 0x00, 0x02, 0x80, 0x53, 0x00, 0x00, 0x20, 0x00, 0xff, 0xff, 0x50, 0x00, 0x00},
+			14,				/* Query Content Length */
+			0x33,			/* Response ctrl1 */
 			0x90,			/* Response ctrl2 */
-			20,				/* Value Pos */
-			4,				/* Value Len */
-			16				/* Timestamp Pos */
+			{
+					{
+						"power_dc_1", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						20,				/* Value Pos */
+						4,				/* Value Len */
+						16				/* Timestamp Pos */
+					},
+					{
+						"power_dc_2", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						48,				/* Value Pos */
+						4,				/* Value Len */
+						44				/* Timestamp Pos */
+					},
+					{
+						"voltage_dc_1", /* Value name */
+						"V",			/* Unit */
+						0.01,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						76,				/* Value Pos */
+						4,				/* Value Len */
+						72				/* Timestamp Pos */
+					},
+					{
+						"voltage_dc_2", 	/* Value name */
+						"V",			/* Unit */
+						0.01,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						104,			/* Value Pos */
+						4,				/* Value Len */
+						100				/* Timestamp Pos */
+					},
+			},
+			4,				/* Value Count */
+	},
+	/* AC stuff*/
+	{
+			0x09,			/* Query ctrl1 */
+			0xa0,			/* Query ctrl2 */
+			0x00,			/* ArchCD */
+			0x00,			/* Zero */
+			0x00,			/* C */
+							/* Query Content */
+			{0x80, 0x00, 0x02, 0x80, 0x51, 0x00, 0x00, 0x20, 0x00, 0xff, 0xff, 0x50, 0x00},
+			13,				/* Query Content Length */
+			0x59,			/* Response ctrl1 */
+			0x90,			/* Response ctrl2 */
+			{
+					{
+						"ac_unkown_1", 	/* Value name */
+						"??",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						20,				/* Value Pos */
+						4,				/* Value Len */
+						16				/* Timestamp Pos */
+					},
+					{
+						"ac_unkown_2", 	/* Value name */
+						"??",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						60,				/* Value Pos */
+						4,				/* Value Len */
+						56				/* Timestamp Pos */
+					},
+					{
+						"ac_unkown_3", /* Value name */
+						"??",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						100,				/* Value Pos */
+						4,				/* Value Len */
+						96				/* Timestamp Pos */
+					},
+					{
+						"ac_unkown_4", 	/* Value name */
+						"??",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						140,			/* Value Pos */
+						4,				/* Value Len */
+						136				/* Timestamp Pos */
+					},
+					{
+						"ac_unkown_5", 	/* Value name */
+						"??",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						180,				/* Value Pos */
+						4,				/* Value Len */
+						176				/* Timestamp Pos */
+					},
+					{
+						"ac_unkown_6", 	/* Value name */
+						"??",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						220,				/* Value Pos */
+						4,				/* Value Len */
+						216				/* Timestamp Pos */
+					},
+					{
+						"ac_unkown_7", /* Value name */
+						"??",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						260,				/* Value Pos */
+						4,				/* Value Len */
+						256				/* Timestamp Pos */
+					},
+					{
+						"ac_unkown_8", 	/* Value name */
+						"??",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						300,			/* Value Pos */
+						4,				/* Value Len */
+						296				/* Timestamp Pos */
+					},
+			},
+			8,				/* Value Count */
 	},
 
-	//
-
+	/* 09 a0 800002805100002000ffff5000 */
 };
 
 /* Print level1 packet from its struct */
@@ -158,6 +343,8 @@ void in_smadata2plus_level2_packet_print(char * output,
 void in_smadata2plus_level1_framgment_append(struct bluetooth_inverter *inv,
 		struct smadata2_l1_packet *p){
 
+	/* TODO: Merge redundant code in fragment and read */
+
 	/* wait for start package */
 	while (in_bluetooth_get_byte(inv) != SMADATA2PLUS_STARTBYTE) {
 		usleep(500);
@@ -174,7 +361,9 @@ void in_smadata2plus_level1_framgment_append(struct bluetooth_inverter *inv,
 
 	int len = len1 + (len2 * 256);
 
-	in_bluetooth_get_bytes(inv, NULL, 14);
+	in_bluetooth_get_bytes(inv, NULL, 12);
+
+	p->cmd_code = in_bluetooth_get_byte(inv) + in_bluetooth_get_byte(inv) * 256;
 
 	in_bluetooth_get_bytes(inv, p->content + (p->length- SMADATA2PLUS_L1_HEADER_LEN),
 			len - SMADATA2PLUS_L1_HEADER_LEN);
@@ -187,7 +376,7 @@ void in_smadata2plus_level1_framgment_append(struct bluetooth_inverter *inv,
 
 	log_debug("[L1] Received packet with %s", output);
 
-	if (p->content[p->length - SMADATA2PLUS_L1_HEADER_LEN-1]!= 0x7e){
+	if (p->cmd_code == SMADATA2PLUS_L1_CMDCODE_FRAGMENT && p->content[p->length - SMADATA2PLUS_L1_HEADER_LEN-1]!= 0x7e){
 		log_debug ("[L1] Detected Fragmented Packet");
 		in_smadata2plus_level1_framgment_append(inv,p);
 	}
@@ -227,8 +416,6 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 	/* packet_len */
 	p->length = len1 + (len2 * 256);
 
-	printf("\nLengths len1=%d len2=%d len=%d\n",len1,len2,p->length);
-
 	/* getcontent */
 	in_bluetooth_get_bytes(inv, p->content,
 			p->length - SMADATA2PLUS_L1_HEADER_LEN);
@@ -245,7 +432,7 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 			&& memcmp(p->content + 1, SMADATA2PLUS_L2_HEADER, 4) == 0) {
 
 		/* Check if L2 Paket is fragmented */
-		if (p->content[p->length - SMADATA2PLUS_L1_HEADER_LEN-1]!= 0x7e){
+		if (p->cmd_code == SMADATA2PLUS_L1_CMDCODE_FRAGMENT && p->content[p->length - SMADATA2PLUS_L1_HEADER_LEN-1]!= 0x7e){
 			log_debug ("[L1] Detected Fragmented Packet");
 			in_smadata2plus_level1_framgment_append(inv,p);
 		}
@@ -717,57 +904,64 @@ void in_smadata2plus_login(struct bluetooth_inverter * inv) {
 
 }
 
-void in_smadata2plus_parse_value(struct smadata2_l1_packet * p1,
-		struct smadata2_l2_packet * p2, struct smadata2_value * value) {
+void in_smadata2plus_parse_values(struct smadata2_l1_packet * p1,
+		struct smadata2_l2_packet * p2, struct smadata2_query * query) {
+
+	struct smadata2_value *value;
 
 	int max = 0;
 
-	/* Search for last position in content */
-	if ((value->r_value_pos + value->r_value_len)
-			> value->r_timestamp_pos + 4) {
-		max = (value->r_value_pos + value->r_value_len);
-	} else {
-		max = value->r_timestamp_pos + 4;
-	}
 
-	/* check if matches */
-	if (p2->ctrl1 == value->r_ctrl1 && p2->ctrl2 == value->r_ctrl2
-			&& p2->content_length >= max) {
+	for (int value_pos = 0; value_pos < query->value_count; ++value_pos) {
 
-		/* copy time stamp */
-		memcpy(&value->timestamp, p2->content + value->r_timestamp_pos, 4);
-		/* copy value */
-		memcpy(&value->value, p2->content + value->r_value_pos,
-				value->r_value_len);
 
-		if ((float) ((int) value->factor) == value->factor) {
-			/* Ganzzahl */
-			log_info(
-					"[Value] timestamp=%d %s=%d%s", value->timestamp, value->name, value->value, value->unit);
+		value = &(query->values[value_pos]);
 
+		/* Search for last position in content */
+		if ((value->r_value_pos + value->r_value_len)
+				> value->r_timestamp_pos + 4) {
+			max = (value->r_value_pos + value->r_value_len);
 		} else {
-			/* Float */
-			double value_double = ((double) value->value)
-					* ((double) value->factor);
-
-			/* Decide how many after decimals */
-			int after_dec_point = 0;
-			if (value->factor == 0.1)
-				after_dec_point = 1;
-			else if (value->factor == 0.01)
-				after_dec_point = 2;
-			else if (value->factor == 0.001)
-				after_dec_point = 3;
-			else
-				after_dec_point = 3;
-
-			log_info(
-					"[Value] timestamp=%d %s=%.*lf%s", value->timestamp, value->name, after_dec_point, value_double, value->unit);
-
+			max = value->r_timestamp_pos + 4;
 		}
 
-	}
+		/* check if matches */
+		if (p2->ctrl1 == query->r_ctrl1 && p2->ctrl2 == query->r_ctrl2
+				&& p2->content_length >= max) {
 
+			/* copy time stamp */
+			memcpy(&value->timestamp, p2->content + value->r_timestamp_pos, 4);
+			/* copy value */
+			memcpy(&value->value, p2->content + value->r_value_pos,
+					value->r_value_len);
+
+			if ((float) ((int) value->factor) == value->factor) {
+				/* Ganzzahl */
+				log_info(
+						"[Value] timestamp=%d %s=%d%s", value->timestamp, value->name, value->value, value->unit);
+
+			} else {
+				/* Float */
+				double value_double = ((double) value->value)
+						* ((double) value->factor);
+
+				/* Decide how many after decimals */
+				int after_dec_point = 0;
+				if (value->factor == 0.1)
+					after_dec_point = 1;
+				else if (value->factor == 0.01)
+					after_dec_point = 2;
+				else if (value->factor == 0.001)
+					after_dec_point = 3;
+				else
+					after_dec_point = 3;
+
+				log_info(
+						"[Value] timestamp=%d %s=%.*lf%s", value->timestamp, value->name, after_dec_point, value_double, value->unit);
+
+			}
+		}
+	}
 }
 
 void in_smadata2plus_get_values(struct bluetooth_inverter * inv) {
@@ -778,12 +972,12 @@ void in_smadata2plus_get_values(struct bluetooth_inverter * inv) {
 	struct smadata2_l1_packet sent_pl1 = { 0 };
 	struct smadata2_l2_packet sent_pl2 = { 0 };
 
-	struct smadata2_value *value;
+	struct smadata2_query *value;
 
 	for (int value_pos = 0; value_pos <
-		(sizeof(SMADATA2PLUS_VALUES)/ sizeof(struct smadata2_value)); ++value_pos) {
+		(sizeof(SMADATA2PLUS_QUERIES)/ sizeof(struct smadata2_query)); ++value_pos) {
 
-		value = &SMADATA2PLUS_VALUES[value_pos];
+		value = &SMADATA2PLUS_QUERIES[value_pos];
 
 		in_smadata2plus_level1_clear(&sent_pl1);
 		in_smadata2plus_level2_clear(&sent_pl2);
@@ -814,7 +1008,7 @@ void in_smadata2plus_get_values(struct bluetooth_inverter * inv) {
 				SMADATA2PLUS_L1_CMDCODE_LEVEL2);
 
 		/* Parse L2 Content */
-		in_smadata2plus_parse_value(&recv_pl1, &recv_pl2, value);
+		in_smadata2plus_parse_values(&recv_pl1, &recv_pl2, value);
 
 	}
 
