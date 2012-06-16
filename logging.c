@@ -111,7 +111,7 @@ static void logging_global_logger_destructor()
 void log_init()
 {
 	logger = logging_constructor(stderr);
-	logging_set_loglevel(logger, ll_debug);
+	logging_set_loglevel(logger, ll_info);
 	log_debug("Created global logger.");
 	atexit(logging_global_logger_destructor);
 }
