@@ -19,31 +19,14 @@
  *  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef OPENSUNNY_IN_BLUETOOTH_H_
-#define OPENSUNNY_IN_BLUETOOTH_H_
+#ifndef OPENSUNNY_H_
+#define OPENSUNNY_H_
 
-#include <stdio.h>
+#include "utils.h"
+#include "logging.h"
+#include "in_bluetooth.h"
+#include "in_smadata2plus.h"
 
-struct bluetooth_inverter {
-	char name[32];
-	char macaddr[18];
-	unsigned char password[13];
-	int socket_fd;
-	int socket_status;
-	unsigned char buffer[BUFSIZ];
-	int buffer_len;
-	int buffer_position;
-	int l2_packet_send_count;
-};
 
-void in_bluetooth_connect(struct bluetooth_inverter * inv);
-int in_bluetooth_connect_read(struct bluetooth_inverter * inv);
-char in_bluetooth_get_byte(struct bluetooth_inverter * inv);
-void in_bluetooth_get_bytes(struct bluetooth_inverter * inv,
-		unsigned char *buffer, int count);
-int in_bluetooth_write(struct bluetooth_inverter * inv, unsigned char * buffer,
-		int len);
-void in_bluetooth_get_my_address(struct bluetooth_inverter * inv,
-		unsigned char * addr);
 
-#endif /* OPENSUNNY_IN_BLUETOOTH_H_ */
+#endif /* OPENSUNNY_H_ */

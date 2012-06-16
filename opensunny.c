@@ -19,31 +19,45 @@
  *  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef OPENSUNNY_IN_BLUETOOTH_H_
-#define OPENSUNNY_IN_BLUETOOTH_H_
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-struct bluetooth_inverter {
-	char name[32];
-	char macaddr[18];
-	unsigned char password[13];
-	int socket_fd;
-	int socket_status;
-	unsigned char buffer[BUFSIZ];
-	int buffer_len;
-	int buffer_position;
-	int l2_packet_send_count;
-};
+#include "opensunny.h"
 
-void in_bluetooth_connect(struct bluetooth_inverter * inv);
-int in_bluetooth_connect_read(struct bluetooth_inverter * inv);
-char in_bluetooth_get_byte(struct bluetooth_inverter * inv);
-void in_bluetooth_get_bytes(struct bluetooth_inverter * inv,
-		unsigned char *buffer, int count);
-int in_bluetooth_write(struct bluetooth_inverter * inv, unsigned char * buffer,
-		int len);
-void in_bluetooth_get_my_address(struct bluetooth_inverter * inv,
-		unsigned char * addr);
 
-#endif /* OPENSUNNY_IN_BLUETOOTH_H_ */
+/*
+ * TODO: Configfile with ini and multi inverter support
+ * TODO: Mode for analyzing sniff wireshark binfiles from  Sunny Explorer
+ * TODO: Get historic data from inverter
+ * TODO: DB Api for value storage
+ *
+ */
+
+/* Main Routine smatool */
+int main(int argc, char **argv) {
+
+	/* Enable Logging */
+	log_init();
+
+	/* Inizialize Bluetooth Inverter */
+	struct bluetooth_inverter inv = { { 0 } };
+
+	strcpy(inv.macaddr, "00:80:25:22:C6:3B");
+
+	memcpy(inv.password, "0000", 5);
+
+	in_bluetooth_connect(&inv);
+
+	in_smadata2plus_connect(&inv);
+
+	in_smadata2plus_login(&inv);
+
+	in_smadata2plus_get_values(&inv);
+
+	close(inv.socket_fd);
+
+	exit(0);
+}

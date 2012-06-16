@@ -1,22 +1,28 @@
-/* tool to read power production data for SMA solar power convertors
-   Copyright flonatel GmbH & Co. KG, 2012
+/*
+ *  OpenSunny -- OpenSource communication with SMA Readers
+ *
+ *  Copyright (C) 2012 Christian Simon <simon@swine.de>
+ *  Copyright (C) 2012 flonatel GmbH & Co. KG
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program (see the file COPYING included with this
+ *  distribution); if not, write to the Free Software Foundation, Inc.,
+ *  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
+#ifndef OPENSUNNY_LOGGING_H
+#define OPENSUNNY_LOGGING_H
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-#ifndef LOGGING_H
-#define LOGGING_H
-
-#include "smatool.h"
 #include <stdio.h>
 
 enum loglevel_enum {
@@ -66,4 +72,4 @@ char const * const level2type(loglevel_t level);
 /* This must be called before the first log. */
 void log_init();
 
-#endif
+#endif /* OPENSUNNY_LOGGING_H*/
