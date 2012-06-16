@@ -1,0 +1,36 @@
+***
+*** OpenSunny -- OpenSource communication with SMA Readers
+***
+
+**
+** Thanks to
+**
+
+* http://code.google.com/p/sma-bluetooth/
+* http://code.google.com/r/sf-pvlog
+* http://code.google.com/r/janus44444-sma-bluetooth/
+* https://github.com/stuartpittaway/nanodesmapvmonitor
+
+**
+** Usage
+**
+
+Project is at very early stage. So don't expect too much functionality
+
+Example usage:
+
+./opensunny -i 00:80:25:22:C6:3B
+2012-06-16T11:04:07.885097:INFO:[Value] timestamp=1339837491 power_ac=952W
+2012-06-16T11:04:07.962390:INFO:[Value] timestamp=1339837491 yield_total=207.731kWh
+2012-06-16T11:04:08.043337:INFO:[Value] timestamp=1339837491 power_dc_1=536W
+2012-06-16T11:04:08.043362:INFO:[Value] timestamp=1339837491 power_dc_2=475W
+2012-06-16T11:04:08.043373:INFO:[Value] timestamp=1339837491 voltage_dc_1=309.370V
+2012-06-16T11:04:08.043387:INFO:[Value] timestamp=1339837491 voltage_dc_2=283.240V
+2012-06-16T11:04:08.146788:INFO:[Value] timestamp=1339837487 ac_unkown_1=35??
+2012-06-16T11:04:08.146809:INFO:[Value] timestamp=1339837491 ac_unkown_2=303??
+2012-06-16T11:04:08.146820:INFO:[Value] timestamp=1339837491 ac_unkown_3=303??
+2012-06-16T11:04:08.146829:INFO:[Value] timestamp=1339837487 ac_unkown_4=16777518??
+2012-06-16T11:04:08.146838:INFO:[Value] timestamp=1339837487 ac_unkown_5=336??
+2012-06-16T11:04:08.146847:INFO:[Value] timestamp=1339837487 ac_unkown_6=16777518??
+2012-06-16T11:04:08.146856:INFO:[Value] timestamp=1339837491 ac_unkown_7=16777267??
+2012-06-16T11:04:08.146865:INFO:[Value] timestamp=1339837491 ac_unkown_8=557??
