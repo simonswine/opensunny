@@ -94,15 +94,30 @@ void in_bluetooth_get_my_address(struct bluetooth_inverter * inv,
 		unsigned char * addr) {
 
 	/* Get my Mac */
-	unsigned int eight = 8;
-	unsigned char mymac[8] = { 0 };
-	getsockname(inv->socket_fd, &mymac, &eight);
+	struct sockaddr_rc mymac = { 0 };
+	//struct sockaddr mymac;
+	unsigned int mymac_size = sizeof(mymac);
+
+	getsockname(inv->socket_fd,(struct sockaddr *) &mymac, &mymac_size);
+
+
+
 
 	/* Copy to Buffer */
-	memcpy(addr, mymac + 2, 6);
+	memcpy(addr, &mymac.rc_bdaddr, 6);
 
 	/* Reverse Buffer */
 	buffer_reverse(addr, 6);
+
+	/* Log my BT MAC */
+	char buffer_hex[6*3];
+
+	buffer_hex_dump(buffer_hex, addr, 6);
+	log_debug("[BT] My MAC: %s", buffer_hex);
+
+
+	
+
 
 }
 
