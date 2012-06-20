@@ -23,12 +23,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <time.h>
 
 #include "opensunny.h"
 
-/* INVERTER Code */
-unsigned char SMADATA2PLUS_INVCODE[6] = { 0x5c, 0xaf, 0xf0, 0x1d, 0x50, 0x00 };
-//unsigned char SMADATA2PLUS_INVCODE[6] = { 0x78, 0x00, 0xd6, 0x12, 0x70, 0x39 };
 
 /* L1 Stuff */
 unsigned char SMADATA2PLUS_L1_CONTENT_BROADCAST[13] = { 0x00, 0x04, 0x70, 0x00,
@@ -91,7 +89,7 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 						0L,				/* Actual Value */
 						0,				/* Timestamp */
 						20,				/* Value Pos */
-						4,				/* Value Len */
+						3,				/* Value Len */
 						16,				/* Timestamp Pos */
 					},
 			},
@@ -124,53 +122,6 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 			1,				/* Value Count */
 
 	},
-//	/* Archive Values */
-//	{
-//			0x09,			/* Query ctrl1 */
-//			0xe0,			/* Query ctrl2 */
-//			0x00,			/* ArchCD */
-//			0x00,			/* Zero */
-//			0x00,			/* C */
-//							/* Query Content */
-//							{0x80, 0x00, 0x02, 0x00, 0x70, 0x70, 0x28, 0xdb, 0x4f, 0x78, 0x2f, 0xdb, 0x4f},
-///* Somtimes answer 			{ 0x80, 0x0c, 0x00, 0xfd, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00 },*/
-//			13,				/* Query Content Length */
-//			0x1e,			/* Response ctrl1 */
-//			0xd0,			/* Response ctrl2 */
-//			{
-//					{
-//						"unkown_1", 	/* Value name */
-//						"??",		/* Unit */
-//						1.0,			/* Factor */
-//						0L,				/* Actual Value */
-//						0,				/* Timestamp */
-//						16,				/* Value Pos */
-//						4,				/* Value Len */
-//						12				/* Timestamp Pos */
-//					},
-//					{
-//						"unkown_2", 	/* Value name */
-//						"??",		/* Unit */
-//						1.0,			/* Factor */
-//						0L,				/* Actual Value */
-//						0,				/* Timestamp */
-//						28,				/* Value Pos */
-//						4,				/* Value Len */
-//						24				/* Timestamp Pos */
-//					},
-//					{
-//						"unkown_3", 	/* Value name */
-//						"??",		/* Unit */
-//						1.0,			/* Factor */
-//						0L,				/* Actual Value */
-//						0,				/* Timestamp */
-//						40,				/* Value Pos */
-//						4,				/* Value Len */
-//						36				/* Timestamp Pos */
-//					},
-//			},
-//			3,				/* Value Count */
-//	},
 	/* DC stuff finally */
 	{
 			0x44,			/* Query ctrl1 */
@@ -191,7 +142,7 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 						0L,				/* Actual Value */
 						0,				/* Timestamp */
 						20,				/* Value Pos */
-						4,				/* Value Len */
+						3,				/* Value Len */
 						16				/* Timestamp Pos */
 					},
 					{
@@ -201,7 +152,7 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 						0L,				/* Actual Value */
 						0,				/* Timestamp */
 						48,				/* Value Pos */
-						4,				/* Value Len */
+						3,				/* Value Len */
 						44				/* Timestamp Pos */
 					},
 					{
@@ -211,7 +162,7 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 						0L,				/* Actual Value */
 						0,				/* Timestamp */
 						76,				/* Value Pos */
-						4,				/* Value Len */
+						3,				/* Value Len */
 						72				/* Timestamp Pos */
 					},
 					{
@@ -221,113 +172,36 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 						0L,				/* Actual Value */
 						0,				/* Timestamp */
 						104,			/* Value Pos */
-						4,				/* Value Len */
+						3,				/* Value Len */
 						100				/* Timestamp Pos */
 					},
 			},
 			4,				/* Value Count */
 	},
-	/* AC stuff*/
-	{
-			0x09,			/* Query ctrl1 */
-			0xa0,			/* Query ctrl2 */
-			0x00,			/* ArchCD */
-			0x00,			/* Zero */
-			0x00,			/* C */
-							/* Query Content */
-			{0x80, 0x00, 0x02, 0x80, 0x51, 0x00, 0x00, 0x20, 0x00, 0xff, 0xff, 0x50, 0x00},
-			13,				/* Query Content Length */
-			0x59,			/* Response ctrl1 */
-			0x90,			/* Response ctrl2 */
-			{
-					{
-						"ac_unkown_1", 	/* Value name */
-						"??",			/* Unit */
-						1.0,			/* Factor */
-						0L,				/* Actual Value */
-						0,				/* Timestamp */
-						20,				/* Value Pos */
-						4,				/* Value Len */
-						16				/* Timestamp Pos */
-					},
-					{
-						"ac_unkown_2", 	/* Value name */
-						"??",			/* Unit */
-						1.0,			/* Factor */
-						0L,				/* Actual Value */
-						0,				/* Timestamp */
-						60,				/* Value Pos */
-						4,				/* Value Len */
-						56				/* Timestamp Pos */
-					},
-					{
-						"ac_unkown_3", /* Value name */
-						"??",			/* Unit */
-						1.0,			/* Factor */
-						0L,				/* Actual Value */
-						0,				/* Timestamp */
-						100,				/* Value Pos */
-						4,				/* Value Len */
-						96				/* Timestamp Pos */
-					},
-					{
-						"ac_unkown_4", 	/* Value name */
-						"??",			/* Unit */
-						1.0,			/* Factor */
-						0L,				/* Actual Value */
-						0,				/* Timestamp */
-						140,			/* Value Pos */
-						4,				/* Value Len */
-						136				/* Timestamp Pos */
-					},
-					{
-						"ac_unkown_5", 	/* Value name */
-						"??",			/* Unit */
-						1.0,			/* Factor */
-						0L,				/* Actual Value */
-						0,				/* Timestamp */
-						180,				/* Value Pos */
-						4,				/* Value Len */
-						176				/* Timestamp Pos */
-					},
-					{
-						"ac_unkown_6", 	/* Value name */
-						"??",			/* Unit */
-						1.0,			/* Factor */
-						0L,				/* Actual Value */
-						0,				/* Timestamp */
-						220,				/* Value Pos */
-						4,				/* Value Len */
-						216				/* Timestamp Pos */
-					},
-					{
-						"ac_unkown_7", /* Value name */
-						"??",			/* Unit */
-						1.0,			/* Factor */
-						0L,				/* Actual Value */
-						0,				/* Timestamp */
-						260,				/* Value Pos */
-						4,				/* Value Len */
-						256				/* Timestamp Pos */
-					},
-					{
-						"ac_unkown_8", 	/* Value name */
-						"??",			/* Unit */
-						1.0,			/* Factor */
-						0L,				/* Actual Value */
-						0,				/* Timestamp */
-						300,			/* Value Pos */
-						4,				/* Value Len */
-						296				/* Timestamp Pos */
-					},
-			},
-			8,				/* Value Count */
-	},
-
-	/* 09 a0 800002805100002000ffff5000 */
 };
 
-/* Print level1 packet from its struct */
+/** Level1 functions **/
+
+
+/* Clear packet struct */
+void in_smadata2plus_level1_clear(struct smadata2_l1_packet *p) {
+	memset(p, 0, sizeof(*p));
+}
+
+/* Wait as long until packet with specfic cmdcode is received */
+void in_smadata2plus_level1_cmdcode_wait(struct bluetooth_inverter * inv,
+		struct smadata2_l1_packet *p, struct smadata2_l2_packet * p2 , int cmdcode) {
+
+	log_debug("[L1] Wait for packet cmdcode == %d", cmdcode);
+	int act_cmdcode = in_smadata2plus_level1_packet_read(inv, p, p2);
+	while (act_cmdcode != cmdcode) {
+		act_cmdcode = in_smadata2plus_level1_packet_read(inv, p, p2);
+	}
+	log_debug("[L1] Got packet cmdcode == %d", cmdcode);
+
+}
+
+/* Debug print l1 struct */
 void in_smadata2plus_level1_packet_print(char * output,
 		struct smadata2_l1_packet *p) {
 
@@ -344,68 +218,12 @@ void in_smadata2plus_level1_packet_print(char * output,
 
 }
 
-void in_smadata2plus_level2_packet_print(char * output,
-		struct smadata2_l2_packet *p) {
-
-	/* for output */
-	char content_hex[p->content_length * 3];
-	buffer_hex_dump(content_hex, p->content, p->content_length);
-
-	sprintf(output,
-			"ctrl1=%02x ctrl2=%02x archcd=%02x zero=%02x c=%02x content[%dbytes]=%s",
-			p->ctrl1, p->ctrl2, p->archcd, p->zero, p->c, p->content_length,
-			content_hex);
-
-}
-
-/* Read level1 packet from stream */
-
-void in_smadata2plus_level1_framgment_append(struct bluetooth_inverter *inv,
-		struct smadata2_l1_packet *p){
-
-	/* TODO: Merge redundant code in fragment and read */
-
-	/* wait for start package */
-	while (in_bluetooth_get_byte(inv) != SMADATA2PLUS_STARTBYTE) {
-		usleep(500);
-	}
-
-	/* Fetching Checksum */
-	unsigned char len1 = in_bluetooth_get_byte(inv);
-	unsigned char len2 = in_bluetooth_get_byte(inv);
-	unsigned char checksum = in_bluetooth_get_byte(inv);
-	unsigned char checksumvalidate = SMADATA2PLUS_STARTBYTE ^ len1 ^ len2;
-	if (checksum != checksumvalidate) {
-		log_debug("[L1] Received packet with wrong Checksum");
-	}
-
-	int len = len1 + (len2 * 256);
-
-	in_bluetooth_get_bytes(inv, NULL, 12);
-
-	p->cmd_code = in_bluetooth_get_byte(inv) + in_bluetooth_get_byte(inv) * 256;
-
-	in_bluetooth_get_bytes(inv, p->content + (p->length- SMADATA2PLUS_L1_HEADER_LEN),
-			len - SMADATA2PLUS_L1_HEADER_LEN);
-
-	p->length += len - SMADATA2PLUS_L1_HEADER_LEN;
-
-	/* Packet pritn */
-	char output[BUFSIZ];
-	in_smadata2plus_level1_packet_print(output, p);
-
-	log_debug("[L1] Received packet with %s", output);
-
-	if (p->cmd_code == SMADATA2PLUS_L1_CMDCODE_FRAGMENT && p->content[p->length - SMADATA2PLUS_L1_HEADER_LEN-1]!= 0x7e){
-		log_debug ("[L1] Detected Fragmented Packet");
-		in_smadata2plus_level1_framgment_append(inv,p);
-	}
-
-
-}
-
+/* Read l1 packet from bluetooth stream */
 int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 		struct smadata2_l1_packet *p,struct smadata2_l2_packet *p2) {
+
+	/* Offset for fragments */
+	int offset = 0;
 
 	/* wait for start package */
 	while (in_bluetooth_get_byte(inv) != SMADATA2PLUS_STARTBYTE) {
@@ -421,10 +239,23 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 		log_debug("[L1] Received packet with wrong Checksum");
 	}
 
+	/* packet_len */
+	int content_len = (len1 + (len2 * 256)) - SMADATA2PLUS_L1_HEADER_LEN;
+
+	if (p->cmd_code == SMADATA2PLUS_L1_CMDCODE_FRAGMENT){
+		/* Fragment */
+		offset = p->length- SMADATA2PLUS_L1_HEADER_LEN;
+		p->length += content_len;
+	}
+	else {
+		/* No Fragment */
+		offset = 0;
+		p->length = SMADATA2PLUS_L1_HEADER_LEN + content_len;
+	}
+
 	/* Fetching source + dest addresses */
 	in_bluetooth_get_bytes(inv, p->src, 6);
 	in_bluetooth_get_bytes(inv, p->dest, 6);
-
 
 	/* reverse byte order */
 	buffer_reverse(p->src, 6);
@@ -433,190 +264,46 @@ int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 	/* cmdcode */
 	p->cmd_code = in_bluetooth_get_byte(inv) + in_bluetooth_get_byte(inv) * 256;
 
-	/* packet_len */
-	p->length = len1 + (len2 * 256);
-
 	/* getcontent */
-	in_bluetooth_get_bytes(inv, p->content,
-			p->length - SMADATA2PLUS_L1_HEADER_LEN);
+	in_bluetooth_get_bytes(inv, p->content+offset,
+			content_len);
 
-	/* Packet pritn */
-	char output[BUFSIZ];
-	in_smadata2plus_level1_packet_print(output, p);
 
-	log_debug("[L1] Received packet with %s", output);
-
-	/* Check if contains L2 packet */
-	if (p->length - SMADATA2PLUS_L1_HEADER_LEN > 4
-			&& p->content[0] == SMADATA2PLUS_STARTBYTE
-			&& memcmp(p->content + 1, SMADATA2PLUS_L2_HEADER, 4) == 0) {
-
-		/* Check if L2 Paket is fragmented */
-		if (p->cmd_code == SMADATA2PLUS_L1_CMDCODE_FRAGMENT && p->content[p->length - SMADATA2PLUS_L1_HEADER_LEN-1]!= 0x7e){
-			log_debug ("[L1] Detected Fragmented Packet");
-			in_smadata2plus_level1_framgment_append(inv,p);
-		}
-		/* Check if got L2 struct */
-		if (p2 != NULL)
-			in_smadata2plus_level2_packet_read(p->content,
-				p->length - SMADATA2PLUS_L1_HEADER_LEN, p2);
-
-	}
-
-	return p->cmd_code;
-
-}
-
-void in_smadata2plus_level2_packet_read(unsigned char *buffer, int len,
-		struct smadata2_l2_packet *p) {
-
-	int pos = 0;
-
-	/* Strip escapes */
-	int len_bef = len;
-	in_smadata2plus_level2_strip_escapes(buffer, &len);
-	int diff = len_bef - len;
-
-	/* Remove checksum */
-	len -= 1;
-	unsigned char checksum[2], checksum_recv[2];
-	checksum_recv[1] = buffer[(len--) - 1];
-	checksum_recv[0] = buffer[(len--) - 1];
-
-	/* Generate checksum */
-	in_smadata2plus_level2_tryfcs16(buffer + 1, len - 1, checksum);
-
-	/* Log */
-	log_debug(
-			"[L2] Unescaped %d chars, checksum %02x:%02x==%02x:%02x  ", diff, checksum[0], checksum[1], checksum_recv[0], checksum_recv[1]);
-
-	/* Compare checksums */
-	if (memcmp(checksum, checksum_recv, 2) != 0) {
-		log_info("[L2] Received packet with wrong Checksum");
+	/* Check if L1 packet is fragmented */
+	if (p->cmd_code == SMADATA2PLUS_L1_CMDCODE_FRAGMENT){
+				return in_smadata2plus_level1_packet_read(inv,p,p2);
 	} else {
 
-		/*** Start Reading of packet ***/
-
-		/* Start byte */
-		pos++;
-
-		/* header bytes */
-		pos += sizeof(SMADATA2PLUS_L2_HEADER);
-
-		/* Ctrl codes */
-		p->ctrl1 = buffer[pos++];
-		p->ctrl2 = buffer[pos++];
-
-		/* Address style */
-		pos += 6;
-
-		/* ArchCd and zero */
-		p->archcd = buffer[pos++];
-		p->zero = buffer[pos++];
-
-		/* Address style again (invertercode) */
-		pos += 6;
-
-		/* zero and  c */
-		pos++;
-		p->c = buffer[pos++];
-
-		/* four zeros */
-		pos += 4;
-
-		/* packetcount */
-		pos += 2;
-
-		/* content */
-		p->content_length = len - pos;
-		memcpy(p->content, buffer + pos, p->content_length);
+		/* Packet complete */
 
 		/* Packet print */
 		char output[BUFSIZ];
-		in_smadata2plus_level2_packet_print(output, p);
-		log_debug("[L2] Received packet with  %s", output);
+		in_smadata2plus_level1_packet_print(output, p);
+		log_debug("[L1] Received packet with %s", output);
+
+		/* Check if contains L2 packet */
+		if (p->length - SMADATA2PLUS_L1_HEADER_LEN > 4
+				&& p->content[0] == SMADATA2PLUS_STARTBYTE
+				&& memcmp(p->content + 1, SMADATA2PLUS_L2_HEADER, 4) == 0) {
+
+
+			/* Check if got L2 struct */
+			if (p2 != NULL)
+				in_smadata2plus_level2_packet_read(p->content,
+					p->length - SMADATA2PLUS_L1_HEADER_LEN, p2);
+
+		}
+
+		return p->cmd_code;
 
 	}
 
-}
 
-int in_smadata2plus_level2_packet_gen(struct bluetooth_inverter *inv,
-		unsigned char * buffer, struct smadata2_l2_packet *p) {
 
-	/* Packet print */
-	char output[BUFSIZ];
-	in_smadata2plus_level2_packet_print(output, p);
-	log_debug("[L2] Send packet with %s", output);
-
-	/** Packet Header **/
-
-	/* Length of buffer used */
-	int len = 0;
-
-	/* Startbyte */
-	buffer[len++] = SMADATA2PLUS_STARTBYTE;
-
-	/* Headerbytes */
-	memcpy(buffer + len, SMADATA2PLUS_L2_HEADER,
-			sizeof(SMADATA2PLUS_L2_HEADER));
-	len += sizeof(SMADATA2PLUS_L2_HEADER);
-
-	/* Ctrl codes */
-	buffer[len++] = p->ctrl1;
-	buffer[len++] = p->ctrl2;
-
-	/* six 0xffs */
-	buffer_repeat(buffer + len, 0xff, 6);
-	len += 6;
-
-	/* ArchCd and zero */
-	buffer[len++] = p->archcd;
-	buffer[len++] = p->zero;
-
-	/* Inverter Code */
-	memcpy(buffer + len, SMADATA2PLUS_INVCODE, sizeof(SMADATA2PLUS_INVCODE));
-	len += sizeof(SMADATA2PLUS_INVCODE);
-
-	/* zero and  c */
-	buffer[len++] = 0x00;
-	buffer[len++] = p->c;
-
-	/* four zeros */
-	buffer_repeat(buffer + len, 0x00, 4);
-	len += 4;
-
-	/* packetcount */
-	buffer[len++] = inv->l2_packet_send_count++;
-
-	/* adding content */
-	memcpy(buffer + len, p->content, p->content_length);
-	len += p->content_length;
-
-	/* build checksum of content */
-	unsigned char checksum[2];
-	in_smadata2plus_level2_tryfcs16(buffer + 1, len - 1, checksum);
-
-	/* Escape special chars */
-	int len_bef = len;
-	in_smadata2plus_level2_add_escapes(buffer, &len);
-
-	/* Adding checksum */
-	int checksum_len = 2;
-	memcpy(buffer + len, checksum, 2);
-	/* Escaping checksum if needed */
-	in_smadata2plus_level2_add_escapes(buffer + len, &checksum_len);
-	len += checksum_len;
-
-	log_debug(
-			"[L2] Escaped %d chars, checksum %02x:%02x", len-len_bef, checksum[0], checksum[1]);
-
-	/* Trailing Byte */
-	buffer[len++] = SMADATA2PLUS_STARTBYTE;
-
-	return len;
 
 }
 
+/* Generate l1 stream from l1 packet struct */
 void in_smadata2plus_level1_packet_send(struct bluetooth_inverter *inv,
 		struct smadata2_l1_packet *p) {
 
@@ -660,67 +347,7 @@ void in_smadata2plus_level1_packet_send(struct bluetooth_inverter *inv,
 
 }
 
-void in_smadata2plus_level1_cmdcode_wait(struct bluetooth_inverter * inv,
-		struct smadata2_l1_packet *p, struct smadata2_l2_packet * p2 , int cmdcode) {
-
-	log_debug("[L1] Wait for packet cmdcode == %d", cmdcode);
-	int act_cmdcode = in_smadata2plus_level1_packet_read(inv, p,p2);
-	while (act_cmdcode != cmdcode) {
-		act_cmdcode = in_smadata2plus_level1_packet_read(inv, p,p2);
-	}
-	log_debug("[L1] Got packet cmdcode == %d", cmdcode);
-
-}
-
-void in_smadata2plus_level1_clear(struct smadata2_l1_packet *p) {
-	memset(p, 0, sizeof(p));
-}
-void in_smadata2plus_level2_clear(struct smadata2_l2_packet *p) {
-	memset(p, 0, sizeof(p));
-}
-
-void in_smadata2plus_level2_trailer(unsigned char * buffer,
-		struct smadata2_l2_packet *p) {
-
-//	  FCSChecksum =FCSChecksum ^ 0xffff;
-//
-//	  btbuffer[packetposition++]=FCSChecksum & 0x00ff;
-//	  btbuffer[packetposition++]=(FCSChecksum >> 8) & 0x00ff;
-//	  btbuffer[packetposition++]=0x7e;  //Trailing byte
-
-}
-
-/*
- * How to use the fcs
- */
-#define PPPINITFCS16 0xffff /* Initial FCS value    */
-
-/*
- * Calculate a new fcs given the current fcs and the new data.
- */
-u_int16_t in_smadata2plus_level2_pppfcs16(u_int16_t fcs, void *_cp, int len) {
-	register unsigned char *cp = (unsigned char *) _cp;
-
-	while (len--)
-		fcs = (fcs >> 8) ^ SMADATA2PLUS_L2_FCSTAB[(fcs ^ *cp++) & 0xff];
-	return (fcs);
-}
-
-void in_smadata2plus_level2_tryfcs16(unsigned char * buffer, int len,
-		unsigned char * cs) {
-	u_int16_t trialfcs;
-	unsigned char stripped[BUFSIZ] = { 0 };
-
-	memcpy(stripped, buffer, len);
-
-	trialfcs = in_smadata2plus_level2_pppfcs16(PPPINITFCS16, stripped, len);
-	trialfcs ^= 0xffff; /* complement */
-
-	cs[0] = (trialfcs & 0x00ff); /* least significant byte first */
-	cs[1] = ((trialfcs >> 8) & 0x00ff);
-
-}
-
+/* Escaping chars in buffer */
 void in_smadata2plus_level2_add_escapes(unsigned char *buffer, int *len) {
 	int i, j;
 
@@ -748,6 +375,218 @@ void in_smadata2plus_level2_add_escapes(unsigned char *buffer, int *len) {
 	}
 }
 
+/* Clear l2 packet struct */
+void in_smadata2plus_level2_clear(struct smadata2_l2_packet *p) {
+	memset(p, 0, sizeof(*p));
+}
+
+/* Generate l2 stream from struct */
+int in_smadata2plus_level2_packet_gen(struct bluetooth_inverter *inv,
+		unsigned char * buffer, struct smadata2_l2_packet *p) {
+
+	char unsigned null_addr[] = {0x00,0x00,0x00,0x00,0x00,0x00};
+	char unsigned dummy_addr[] = {0x31,0x32,0x33,0x34,0x35,0x36};
+
+	/** Validate Paket **/
+
+	/* Rewrite null destination to broadcast */
+	if (memcmp(p->dest,null_addr,6)==0){
+		buffer_repeat(p->dest,0xff,6);
+	}
+
+	/* Rewrite null source to dummy_addr */
+	if (memcmp(p->src,null_addr,6)==0){
+		memcpy(p->src,dummy_addr,6);
+	}
+
+	/* Packet print */
+	char output[BUFSIZ];
+	in_smadata2plus_level2_packet_print(output, p);
+	log_debug("[L2] Send packet with %s", output);
+
+	/** Packet Header **/
+
+	/* Length of buffer used */
+	int len = 0;
+
+	/* Startbyte */
+	buffer[len++] = SMADATA2PLUS_STARTBYTE;
+
+	/* Headerbytes */
+	memcpy(buffer + len, SMADATA2PLUS_L2_HEADER,
+			sizeof(SMADATA2PLUS_L2_HEADER));
+	len += sizeof(SMADATA2PLUS_L2_HEADER);
+
+	/* Ctrl codes */
+	buffer[len++] = p->ctrl1;
+	buffer[len++] = p->ctrl2;
+
+	/* Destination */
+	memcpy(buffer + len, p->dest, 6);
+	len += 6;
+
+	/* ArchCd and zero */
+	buffer[len++] = p->archcd;
+	buffer[len++] = p->zero;
+
+	/* Source */
+	memcpy(buffer + len, p->src, 6);
+	len += 6;
+
+	/* zero and  c */
+	buffer[len++] = 0x00;
+	buffer[len++] = p->c;
+
+	/* four zeros */
+	buffer_repeat(buffer + len, 0x00, 4);
+	len += 4;
+
+	/* packetcount */
+	buffer[len++] = inv->l2_packet_send_count++;
+
+	/* adding content */
+	memcpy(buffer + len, p->content, p->content_length);
+	len += p->content_length;
+
+	/* build checksum of content */
+	unsigned char checksum[2];
+	in_smadata2plus_level2_tryfcs16(buffer + 1, len - 1, checksum);
+
+	/* Escape special chars */
+	int len_bef = len;
+	in_smadata2plus_level2_add_escapes(buffer, &len);
+
+	/* Adding checksum */
+	int checksum_len = 2;
+	memcpy(buffer + len, checksum, 2);
+	/* Escaping checksum if needed */
+	in_smadata2plus_level2_add_escapes(buffer + len, &checksum_len);
+	len += checksum_len;
+
+	log_debug(
+			"[L2] Escaped %d chars, checksum %02x:%02x", len-len_bef, checksum[0], checksum[1]);
+
+	/* Trailing Byte */
+	buffer[len++] = SMADATA2PLUS_STARTBYTE;
+
+	return len;
+
+}
+
+/* Print l2 struct to string */
+void in_smadata2plus_level2_packet_print(char * output,
+		struct smadata2_l2_packet *p) {
+
+	/* for output */
+	char src_addr_hex[20], dest_addr_hex[20],content_hex[p->content_length * 3];
+	buffer_hex_dump(content_hex, p->content, p->content_length);
+
+	buffer_hex_dump(src_addr_hex, p->src, 6);
+	buffer_hex_dump(dest_addr_hex, p->dest, 6);
+
+	sprintf(output,
+			"src=%s dest=%s ctrl1=%02x ctrl2=%02x archcd=%02x zero=%02x c=%02x content[%dbytes]=%s",src_addr_hex, dest_addr_hex,
+			p->ctrl1, p->ctrl2, p->archcd, p->zero, p->c, p->content_length,
+			content_hex);
+
+}
+
+
+/* Read L2 packet from buffer into struct */
+void in_smadata2plus_level2_packet_read(unsigned char *buffer, int len,
+		struct smadata2_l2_packet *p) {
+
+	int pos = 0;
+
+	/* Strip escapes */
+	int len_bef = len;
+	in_smadata2plus_level2_strip_escapes(buffer, &len);
+	int diff = len_bef - len;
+
+	/* Remove checksum */
+	len -= 1;
+	unsigned char checksum[2], checksum_recv[2];
+	checksum_recv[1] = buffer[(len--) - 1];
+	checksum_recv[0] = buffer[(len--) - 1];
+
+	/* Generate checksum */
+	in_smadata2plus_level2_tryfcs16(buffer + 1, len - 1, checksum);
+
+	/* Log */
+	log_debug(
+			"[L2] Unescaped %d chars, checksum %02x:%02x==%02x:%02x  ", diff, checksum[0], checksum[1], checksum_recv[0], checksum_recv[1]);
+
+	/* Compare checksums */
+	if (memcmp(checksum, checksum_recv, 2) != 0) {
+		log_info("[L2] Received packet with wrong Checksum");
+	} else {
+
+		/*** Start Reading of packet ***/
+
+		/* Start byte */
+		pos++;
+
+		/* header bytes */
+		pos += sizeof(SMADATA2PLUS_L2_HEADER);
+
+		/* Ctrl codes */
+		p->ctrl1 = buffer[pos++];
+		p->ctrl2 = buffer[pos++];
+
+		/* Destination */
+		memcpy(p->dest,buffer + pos, 6);
+		pos += 6;
+
+		/* ArchCd and zero */
+		p->archcd = buffer[pos++];
+		p->zero = buffer[pos++];
+
+		/* Source */
+		memcpy(p->src,buffer + pos, 6);
+		pos += 6;
+
+		/* zero and  c */
+		pos++;
+		p->c = buffer[pos++];
+
+		/* four zeros */
+		pos += 4;
+
+		/* packetcount */
+		pos += 2;
+
+		/* content */
+		p->content_length = len - pos;
+		memcpy(p->content, buffer + pos, p->content_length);
+
+		/* Packet print */
+		char output[BUFSIZ];
+		in_smadata2plus_level2_packet_print(output, p);
+		log_debug("[L2] Received packet with  %s", output);
+
+	}
+
+}
+
+
+
+
+
+
+
+
+
+
+/* Calculate a new fcs given the current fcs and the new data. */
+u_int16_t in_smadata2plus_level2_pppfcs16(u_int16_t fcs, void *_cp, int len) {
+	register unsigned char *cp = (unsigned char *) _cp;
+
+	while (len--)
+		fcs = (fcs >> 8) ^ SMADATA2PLUS_L2_FCSTAB[(fcs ^ *cp++) & 0xff];
+	return (fcs);
+}
+
+/* Remove escape chars from buffer */
 void in_smadata2plus_level2_strip_escapes(unsigned char *buffer, int *len) {
 	int i, j;
 
@@ -764,13 +603,29 @@ void in_smadata2plus_level2_strip_escapes(unsigned char *buffer, int *len) {
 	}
 }
 
+/* Generate checksum from buffer */
+void in_smadata2plus_level2_tryfcs16(unsigned char * buffer, int len,
+		unsigned char * cs) {
+	u_int16_t trialfcs;
+	unsigned char stripped[BUFSIZ] = { 0 };
+
+	memcpy(stripped, buffer, len);
+
+	trialfcs = in_smadata2plus_level2_pppfcs16(SMADATA2PLUS_L2_INIT_FCS16, stripped, len);
+	trialfcs ^= 0xffff; /* complement */
+
+	cs[0] = (trialfcs & 0x00ff); /* least significant byte first */
+	cs[1] = ((trialfcs >> 8) & 0x00ff);
+
+}
+
 void in_smadata2plus_connect(struct bluetooth_inverter * inv) {
 
 	/* Intizalize packet structs */
 	struct smadata2_l1_packet recv_pl1 = { 0 };
-	struct smadata2_l2_packet recv_pl2 = { 0 };
+	struct smadata2_l2_packet recv_pl2 = {{ 0 }};
 	struct smadata2_l1_packet sent_pl1 = { 0 };
-	struct smadata2_l2_packet sent_pl2 = { 0 };
+	struct smadata2_l2_packet sent_pl2 = {{ 0 }};
 
 	/* Wait for Broadcast request */
 	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,NULL,
@@ -811,6 +666,7 @@ void in_smadata2plus_connect(struct bluetooth_inverter * inv) {
 	/** Sent first L2 packet*/
 	in_smadata2plus_level1_clear(&sent_pl1);
 	in_smadata2plus_level2_clear(&sent_pl2);
+
 	/* Set cmdcode */
 	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
 	/* Set destination */
@@ -840,6 +696,7 @@ void in_smadata2plus_connect(struct bluetooth_inverter * inv) {
 	/** Sent second L2 packet*/
 	in_smadata2plus_level1_clear(&sent_pl1);
 	in_smadata2plus_level2_clear(&sent_pl2);
+
 	/* Set cmdcode */
 	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
 	/* Set destination */
@@ -852,7 +709,8 @@ void in_smadata2plus_connect(struct bluetooth_inverter * inv) {
 	sent_pl2.zero = 0x03;
 	sent_pl2.c = 0x03;
 	/* Set L2 Content */
-	unsigned char content_packet_two[9] = { 0x80, 0x0E, 0x01, 0xFD, 0xFF, 0xFF,
+
+	unsigned char content_packet_two[] = { 0x80, 0x0E, 0x01, 0xFD, 0xFF, 0xFF,
 			0xFF, 0xFF, 0xFF };
 	memcpy(sent_pl2.content, content_packet_two, sizeof(content_packet_two));
 	sent_pl2.content_length = sizeof(content_packet_two);
@@ -869,9 +727,9 @@ void in_smadata2plus_login(struct bluetooth_inverter * inv) {
 
 	/* Intizalize packet structs */
 	struct smadata2_l1_packet recv_pl1 = { 0 };
-	struct smadata2_l2_packet recv_pl2 = { 0 };
+	struct smadata2_l2_packet recv_pl2 = {{ 0 }};
 	struct smadata2_l1_packet sent_pl1 = { 0 };
-	struct smadata2_l2_packet sent_pl2 = { 0 };
+	struct smadata2_l2_packet sent_pl2 = {{ 0 }};
 
 	/** Sent second L2 login packet*/
 	in_smadata2plus_level1_clear(&sent_pl1);
@@ -984,13 +842,134 @@ void in_smadata2plus_parse_values(struct smadata2_l1_packet * p1,
 	}
 }
 
+/*
+ * Test Query Historic Values
+ */
+void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv){
+
+	/* Packet Structs */
+	struct smadata2_l1_packet recv_pl1 = { 0 };
+	struct smadata2_l2_packet recv_pl2 = {{ 0 }};
+	struct smadata2_l1_packet sent_pl1 = { 0 };
+	struct smadata2_l2_packet sent_pl2 = {{ 0 }};
+
+	/* Get timestamps */
+	time_t day_start, day_end;
+    struct tm *loctime;
+
+    /* Get the current time. */
+    day_start = time (NULL);
+    loctime = localtime (&day_start);
+    loctime->tm_hour = 0;
+    loctime->tm_min = 0;
+    loctime->tm_sec = 0;
+
+    day_start = mktime(loctime);
+    day_start = 0;
+    loctime->tm_mday++;
+    day_end = mktime(loctime);
+
+	in_smadata2plus_level1_clear(&sent_pl1);
+	in_smadata2plus_level2_clear(&sent_pl2);
+	/* Set cmdcode */
+	sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
+	/* Set destination */
+	buffer_repeat(sent_pl1.dest, 0xff, 6);
+	/* Set my address */
+	in_bluetooth_get_my_address(inv, sent_pl1.src);
+	/* Set Layer 2 */
+	sent_pl2.ctrl1 = 0x09;
+	sent_pl2.ctrl2 = 0xe0;
+	/* Set L2 Content */
+	unsigned char content[]={0x80, 0x00, 0x02, 0x00,0x70};
+	memcpy(sent_pl2.content,content, sizeof(content));
+	sent_pl2.content_length = sizeof(content);
+	/* Timestamp start */
+	memcpy(sent_pl2.content+sent_pl2.content_length,&day_start, 4);
+	sent_pl2.content_length +=4;
+	/* Timestamp stop */
+	memcpy(sent_pl2.content+sent_pl2.content_length,&day_end, 4);
+	sent_pl2.content_length +=4;
+
+
+	/* Generate L2 Paket */
+	sent_pl1.length = in_smadata2plus_level2_packet_gen(inv,
+			sent_pl1.content, &sent_pl2);
+	sent_pl1.length += SMADATA2PLUS_L1_HEADER_LEN;
+	/* Send Packet out */
+	in_smadata2plus_level1_packet_send(inv, &sent_pl1);
+
+	/* temp value store */
+	int timestamp=0 ,prev_timestamp = 0,diff=0;
+	long value = 0,prev_value = 0;
+
+	/* Wait for all answers */
+	while(1){
+
+		/* Recv Packet */
+		in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1, &recv_pl2,
+				SMADATA2PLUS_L1_CMDCODE_LEVEL2);
+
+
+		int pos = 12;
+		while(pos < recv_pl2.content_length){
+
+			prev_value = value;
+			prev_timestamp = timestamp;
+
+			value = 0;
+
+			memcpy(&timestamp,recv_pl2.content+pos,4);
+			memcpy(&value,recv_pl2.content+pos+4,8);
+
+			if (prev_timestamp == 0) {
+				/* first run */
+				diff = 0;
+			}
+			else {
+				/* 1 kWh = 1 W / 1000 * 3600s */
+
+				/* Diff of Wh values */
+				diff = value-prev_value;
+				/* Ws */
+				diff *= 3600;
+				/* dt */
+				diff /= timestamp-prev_timestamp;
+
+			}
+
+
+			printf("timestamp=%d total=%.3lf kWh current=%d Watt \n",timestamp, (value/1000.0),diff);
+
+
+			pos +=12;
+
+
+		}
+
+
+
+
+		/* Break if last packet */
+		if (recv_pl2.ctrl1 != 0x7e && recv_pl2.ctrl2 == 0xd0 ) {
+			break;
+		}
+
+	}
+
+
+
+//	80 00 02 00 70 $TIMEFROM1 $TIMETO1 $CRC 7e $END;
+
+}
+
 void in_smadata2plus_get_values(struct bluetooth_inverter * inv) {
 
 	/* Packet Structs */
 	struct smadata2_l1_packet recv_pl1 = { 0 };
-	struct smadata2_l2_packet recv_pl2 = { 0 };
+	struct smadata2_l2_packet recv_pl2 = {{ 0 }};
 	struct smadata2_l1_packet sent_pl1 = { 0 };
-	struct smadata2_l2_packet sent_pl2 = { 0 };
+	struct smadata2_l2_packet sent_pl2 = {{ 0 }};
 
 	struct smadata2_query *value;
 
@@ -1001,6 +980,7 @@ void in_smadata2plus_get_values(struct bluetooth_inverter * inv) {
 
 		in_smadata2plus_level1_clear(&sent_pl1);
 		in_smadata2plus_level2_clear(&sent_pl2);
+
 		/* Set cmdcode */
 		sent_pl1.cmd_code = SMADATA2PLUS_L1_CMDCODE_LEVEL2;
 		/* Set destination */

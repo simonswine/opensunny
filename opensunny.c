@@ -112,6 +112,15 @@ int main(int argc, char **argv) {
 
 	in_smadata2plus_get_values(&inv);
 
+//	in_smadata2plus_get_historic_values(&inv);
+
+//	/* Packet Structs */
+//	struct smadata2_l1_packet recv_pl1 = { 0 };
+//	struct smadata2_l2_packet recv_pl2 = { 0 };
+//
+//	while (1)
+//		in_smadata2plus_level1_packet_read(&inv,&recv_pl1,&recv_pl2);
+
 	close(inv.socket_fd);
 
 	exit(0);

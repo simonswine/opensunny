@@ -35,6 +35,8 @@
 #define SMADATA2PLUS_L1_CMDCODE_10 10  			// 0x000a
 #define SMADATA2PLUS_L1_CMDCODE_12 12  			// 0x000c
 
+#define SMADATA2PLUS_L2_INIT_FCS16 0xffff		// Initial FCS value
+
 #define SMADATA2PLUS_MAX_VALUES 64
 
 /* level1 packet */
@@ -49,6 +51,8 @@ struct smadata2_l1_packet {
 
 /* level2 packet */
 struct smadata2_l2_packet {
+	unsigned char src[6];
+	unsigned char dest[6];
 	unsigned char ctrl1;
 	unsigned char ctrl2;
 	unsigned char archcd;
@@ -87,9 +91,13 @@ struct smadata2_query {
 };
 
 
+void in_smadata2plus_level1_clear(struct smadata2_l1_packet *p);
 
 void in_smadata2plus_level1_cmdcode_wait(struct bluetooth_inverter * inv,
 		struct smadata2_l1_packet *p, struct smadata2_l2_packet * p2 , int cmdcode);
+
+void in_smadata2plus_level1_packet_print(char * output,
+		struct smadata2_l1_packet *p);
 
 int in_smadata2plus_level1_packet_read(struct bluetooth_inverter *inv,
 		struct smadata2_l1_packet *p,struct smadata2_l2_packet *p2);
@@ -99,11 +107,15 @@ void in_smadata2plus_level1_packet_send(struct bluetooth_inverter *inv,
 
 void in_smadata2plus_level2_tryfcs16(unsigned char * buffer, int len, unsigned char * cs);
 
+void in_smadata2plus_level2_packet_print(char * output,
+		struct smadata2_l2_packet *p);
+
 void in_smadata2plus_level2_packet_read(unsigned char *buffer, int len,
 		struct smadata2_l2_packet *p);
 
 int in_smadata2plus_level2_packet_gen(struct bluetooth_inverter *inv,
 		unsigned char * buffer, struct smadata2_l2_packet *p);
+
 
 void in_smadata2plus_level2_add_escapes(unsigned char *buffer, int *len);
 
@@ -114,5 +126,7 @@ void in_smadata2plus_connect(struct bluetooth_inverter * inv);
 void in_smadata2plus_login(struct bluetooth_inverter * inv);
 
 void in_smadata2plus_get_values(struct bluetooth_inverter * inv);
+
+void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv);
 
 #endif /* OPENSUNNY_IN_SMADATA2PLUS_H_ */
