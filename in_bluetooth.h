@@ -23,6 +23,7 @@
 #define OPENSUNNY_IN_BLUETOOTH_H_
 
 #include <stdio.h>
+#include "in_smadata2plus_structs.h"
 
 struct bluetooth_inverter {
 	char name[32];
@@ -34,6 +35,8 @@ struct bluetooth_inverter {
 	int buffer_len;
 	int buffer_position;
 	int l2_packet_send_count;
+	unsigned int serial;
+	struct smadata2_model *model;
 };
 
 void in_bluetooth_connect(struct bluetooth_inverter * inv);

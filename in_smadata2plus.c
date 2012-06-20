@@ -17,7 +17,14 @@
  *  along with this program (see the file COPYING included with this
  *  distribution); if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *  Many thanks to stuartpittaway for his nanode code to query sma
+ *  inverters (https://github.com/stuartpittaway/nanodesmapvmonitor).
+ *  This code is in wide parts derived from his.
+ *
  */
+
+
 
 #include <unistd.h>
 #include <string.h>
@@ -66,6 +73,20 @@ static u_int16_t SMADATA2PLUS_L2_FCSTAB[256] = { 0x0000, 0x1189, 0x2312, 0x329b,
 		0xb0a3, 0x8238, 0x93b1, 0x6b46, 0x7acf, 0x4854, 0x59dd, 0x2d62, 0x3ceb,
 		0x0e70, 0x1ff9, 0xf78f, 0xe606, 0xd49d, 0xc514, 0xb1ab, 0xa022, 0x92b9,
 		0x8330, 0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78 };
+
+/* Define Models */
+struct smadata2_model SMADATA2MODELS[] = {
+		/* 4000TL20/5000TL20 */
+		{
+			"4000TL20/5000TL20",
+			{0x4e,0x00},
+		},
+		/* 4000TL21/5000TL21 */
+		{
+			"4000TL21/5000TL21",
+			{0x8a,0x00},
+		},
+};
 
 /* Define Value Structs */
 struct smadata2_query SMADATA2PLUS_QUERIES[] = {
@@ -178,6 +199,8 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 			},
 			4,				/* Value Count */
 	},
+
+	/* 0E A0 FF FF FF FF FF FF 00 01 78 00 $UNKNOWN 00 01 00 00 00 00 $CNT 80 0C 04 FD FF 07 00 00 00 84 03 00 00 $TIME 00 00 00 00 $PASSWORD $CRC 7E $END;*/
 };
 
 /** Level1 functions **/
@@ -423,6 +446,8 @@ int in_smadata2plus_level2_packet_gen(struct bluetooth_inverter *inv,
 
 	/* Destination */
 	memcpy(buffer + len, p->dest, 6);
+	/* reverse byte order */
+	buffer_reverse(buffer + len, 6);
 	len += 6;
 
 	/* ArchCd and zero */
@@ -431,6 +456,8 @@ int in_smadata2plus_level2_packet_gen(struct bluetooth_inverter *inv,
 
 	/* Source */
 	memcpy(buffer + len, p->src, 6);
+	/* reverse byte order */
+	buffer_reverse(buffer + len, 6);
 	len += 6;
 
 	/* zero and  c */
@@ -536,6 +563,8 @@ void in_smadata2plus_level2_packet_read(unsigned char *buffer, int len,
 		/* Destination */
 		memcpy(p->dest,buffer + pos, 6);
 		pos += 6;
+		/* reverse byte order */
+		buffer_reverse(p->dest, 6);
 
 		/* ArchCd and zero */
 		p->archcd = buffer[pos++];
@@ -544,6 +573,8 @@ void in_smadata2plus_level2_packet_read(unsigned char *buffer, int len,
 		/* Source */
 		memcpy(p->src,buffer + pos, 6);
 		pos += 6;
+		/* reverse byte order */
+		buffer_reverse(p->src, 6);
 
 		/* zero and  c */
 		pos++;
@@ -692,6 +723,15 @@ void in_smadata2plus_connect(struct bluetooth_inverter * inv) {
 	/* Wait for cmdcode 1 */
 	in_smadata2plus_level1_cmdcode_wait(inv, &recv_pl1,&recv_pl2,
 			SMADATA2PLUS_L1_CMDCODE_LEVEL2);
+
+	/* Read serial and model */
+	buffer_reverse(recv_pl2.src,6);
+	memcpy (&inv->serial,recv_pl2.src+2,4);
+	in_smadata2plus_get_model(inv,recv_pl2.src);
+	buffer_reverse(recv_pl2.src,6);
+
+	log_info("[Value] Inverter found serial=%d model=%s",inv->serial,inv->model->name);
+
 
 	/** Sent second L2 packet*/
 	in_smadata2plus_level1_clear(&sent_pl1);
@@ -956,12 +996,30 @@ void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv){
 		}
 
 	}
+}
 
+/* Get model */
+void in_smadata2plus_get_model(struct bluetooth_inverter * inv,unsigned char *model_code) {
+	int model_pos;
+	struct smadata2_model *model;
 
+	for (model_pos = 0;
+			model_pos < (sizeof(SMADATA2MODELS) / sizeof(struct smadata2_model));
+			++model_pos) {
 
-//	80 00 02 00 70 $TIMEFROM1 $TIMETO1 $CRC 7e $END;
+		model = &SMADATA2MODELS[model_pos];
+
+		if (memcmp(model->code, model_code,2) == 0) {
+			/* Set model ptr */
+			inv->model = model;
+
+		}
+
+	}
 
 }
+
+
 
 void in_smadata2plus_get_values(struct bluetooth_inverter * inv) {
 
@@ -1013,3 +1071,6 @@ void in_smadata2plus_get_values(struct bluetooth_inverter * inv) {
 	}
 
 }
+
+
+

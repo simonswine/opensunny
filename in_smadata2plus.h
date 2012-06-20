@@ -39,56 +39,7 @@
 
 #define SMADATA2PLUS_MAX_VALUES 64
 
-/* level1 packet */
-struct smadata2_l1_packet {
-	int length;
-	unsigned char checksum;
-	unsigned char src[6];
-	unsigned char dest[6];
-	int cmd_code;
-	unsigned char content[BUFSIZ];
-};
-
-/* level2 packet */
-struct smadata2_l2_packet {
-	unsigned char src[6];
-	unsigned char dest[6];
-	unsigned char ctrl1;
-	unsigned char ctrl2;
-	unsigned char archcd;
-	unsigned char zero;
-	unsigned char c;
-	unsigned char content[BUFSIZ];
-	int content_length;
-};
-
-/* smadata2 value */
-struct smadata2_value {
-	char name[64];
-	char unit[5];
-	float factor;
-	unsigned long value;
-	int timestamp;
-	int r_value_pos;
-	int r_value_len;
-	int r_timestamp_pos;
-
-};
-
-/* smadata2 query */
-struct smadata2_query {
-	unsigned char q_ctrl1;
-	unsigned char q_ctrl2;
-	unsigned char q_archcd;
-	unsigned char q_zero;
-	unsigned char q_c;
-	unsigned char q_content[128];
-	int q_content_length;
-	unsigned char r_ctrl1;
-	unsigned char r_ctrl2;
-	struct smadata2_value values[12];
-	int value_count;
-};
+#include "in_smadata2plus_structs.h"
 
 
 void in_smadata2plus_level1_clear(struct smadata2_l1_packet *p);
@@ -125,8 +76,10 @@ void in_smadata2plus_connect(struct bluetooth_inverter * inv);
 
 void in_smadata2plus_login(struct bluetooth_inverter * inv);
 
-void in_smadata2plus_get_values(struct bluetooth_inverter * inv);
-
 void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv);
+
+void in_smadata2plus_get_model(struct bluetooth_inverter * inv,unsigned char *model_code) ;
+
+void in_smadata2plus_get_values(struct bluetooth_inverter * inv);
 
 #endif /* OPENSUNNY_IN_SMADATA2PLUS_H_ */
