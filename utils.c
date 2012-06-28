@@ -21,6 +21,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "opensunny.h"
 
@@ -58,3 +59,52 @@ void buffer_repeat(unsigned char * buffer, unsigned char c, int count) {
 		buffer[i] = c;
 	}
 }
+
+int str_mac_validate(char* mac) {
+	int i = 0;
+	int s = 0;
+
+	while (*mac) {
+		if (isxdigit(*mac)) {
+			*mac = tolower(*mac);
+			i++;
+		} else if (*mac == ':' || *mac == '-') {
+
+			if (i == 0 || i / 2 - 1 != s)
+				break;
+
+			*mac = ':';
+
+			++s;
+		} else {
+			s = -1;
+		}
+
+		++mac;
+	}
+
+	return (i == 12 && s == 5);
+}
+
+#ifndef HAVE_STRCASESTR
+char *
+strcasestr(char *haystack, char *needle) {
+	char *p, *startn = 0, *np = 0;
+
+	for (p = haystack; *p; p++) {
+		if (np) {
+			if (toupper(*p) == toupper(*np)) {
+				if (!*++np)
+					return startn;
+			} else
+				np = 0;
+		} else if (toupper(*p) == toupper(*needle)) {
+			np = needle + 1;
+			startn = p;
+		}
+	}
+
+	return 0;
+}
+#endif
+

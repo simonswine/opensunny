@@ -22,10 +22,14 @@
 #ifndef OPENSUNNY_H_
 #define OPENSUNNY_H_
 
+#include "dictionary.h"
+#include "iniparser.h"
 #include "utils.h"
 #include "logging.h"
 #include "in_bluetooth.h"
 #include "in_smadata2plus.h"
+
+#define MAX_INVERTERS 64
 
 
 

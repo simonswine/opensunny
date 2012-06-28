@@ -3,7 +3,7 @@ LDFLAGS     += -lbluetooth
 
 all: opensunny
 
-OBJS=opensunny.o in_bluetooth.o in_smadata2plus.o utils.o logging.o
+OBJS=opensunny.o in_bluetooth.o in_smadata2plus.o utils.o logging.o iniparser.o dictionary.o
 
 opensunny: ${OBJS}
 	${CC} ${CFLAGS} -o opensunny ${OBJS} ${LDFLAGS}

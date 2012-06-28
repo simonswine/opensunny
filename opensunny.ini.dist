@@ -1,0 +1,17 @@
+[main]
+; 
+log_level = 0
+
+
+[Inverter_thalmaessing]
+type = bluetooth
+protocol = smadata2plus
+bt_address = 00:80:25:22:C6:3B
+password = 0000
+
+[inverter_thalmaessing2]
+type = bluetootH
+protocol = smadata2plus
+bt_address = 00-80-25:22:C6:3A
+password = "0000"
+

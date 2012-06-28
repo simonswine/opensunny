@@ -79,6 +79,8 @@ struct smadata2_query {
 struct smadata2_model {
 	char name[64];
 	unsigned char code[2];
+	int max_power[4];
+	int model_count;
 };
 
 

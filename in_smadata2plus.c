@@ -76,17 +76,64 @@ static u_int16_t SMADATA2PLUS_L2_FCSTAB[256] = { 0x0000, 0x1189, 0x2312, 0x329b,
 
 /* Define Models */
 struct smadata2_model SMADATA2MODELS[] = {
-		/* 4000TL20/5000TL20 */
+		/* Inverter 1700TL/2100TL */
 		{
-			"4000TL20/5000TL20",
-			{0x4e,0x00},
+			"%dTL",
+			{0x63,0x00},
+			{1700,2100},
+			2,
 		},
-		/* 4000TL21/5000TL21 */
+		/* Inverter 3000TL */
 		{
-			"4000TL21/5000TL21",
+			"%dTL",
+			{0x71,0x00},
+			{3000},
+			1,
+		},
+		/* Inverter 3000TLHF */
+		{
+			"%dTLHF",
+			{0x83,0x00},
+			{3000},
+			1,
+		},
+		/* Inverter 3000TLHF */
+		{
+			"%dTL",
+			{0xe2,0x00},
+			{3600},
+			1,
+		},
+		/* Inverter 4000TL20/5000TL20 */
+		{
+			"%dTL20",
+			{0x4e,0x00},
+			{4000,5000},
+			2,
+		},
+		/* Inverter 4000TL21/5000TL21 */
+		{
+			"%dTL21",
 			{0x8a,0x00},
+			{4000,5000},
+			2,
+		},
+		/* Inverter 6000TL/7000TL */
+		{
+			"%dTL",
+			{0x63,0x00},
+			{6000,7000},
+			2,
+		},
+		/* Inverter 8000TL/10000TL */
+		{
+			"%dTL",
+			{0x80,0x00},
+			{8000,10000},
+			2,
 		},
 };
+
 
 /* Define Value Structs */
 struct smadata2_query SMADATA2PLUS_QUERIES[] = {

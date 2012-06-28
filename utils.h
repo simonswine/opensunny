@@ -28,8 +28,9 @@ void buffer_reverse(unsigned char * buffer, int len);
 
 void buffer_repeat(unsigned char * buffer, unsigned char c, int count);
 
+int str_mac_validate(char* mac);
+
+char * strcasestr (char *haystack, char *needle);
+
 #endif /* OPENSUNNY_UTILS_H_ */
-
-
-
 
