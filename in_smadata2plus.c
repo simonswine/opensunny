@@ -246,9 +246,148 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 			},
 			4,				/* Value Count */
 	},
+	/* AC stuff finally */
+	{
+			0x09,			/* Query ctrl1 */
+			0xa1,			/* Query ctrl2 */
+			0x00,			/* ArchCD */
+			0x00,			/* Zero */
+			0x00,			/* C */
+							/* Query Content */
+			{0x80, 0x00, 0x02, 0x00, 0x51, 0x00, 0x00, 0x20, 0x00, 0xff, 0xff, 0x50, 0x00, 0x0e},
+			14,				/* Query Content Length */
+			0x79,			/* Response ctrl1 */
+			0x90,			/* Response ctrl2 */
+			{
+					{
+						"power_ac_max_l1", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						48,				/* Value Pos */
+						3,				/* Value Len */
+						44				/* Timestamp Pos */
+					},
+					{
+						"power_ac_max_l2", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						76,				/* Value Pos */
+						3,				/* Value Len */
+						72				/* Timestamp Pos */
+					},
+					{
+						"power_ac_max_l3", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						104,			/* Value Pos */
+						3,				/* Value Len */
+						100				/* Timestamp Pos */
+					},
+					{
+						"power_ac_l1", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						216	,			/* Value Pos */
+						3,				/* Value Len */
+						212				/* Timestamp Pos */
+					},
+					{
+						"power_ac_l2", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						244	,			/* Value Pos */
+						3,				/* Value Len */
+						240				/* Timestamp Pos */
+					},
+					{
+						"power_ac_l3", 	/* Value name */
+						"W",			/* Unit */
+						1.0,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						272	,			/* Value Pos */
+						3,				/* Value Len */
+						268				/* Timestamp Pos */
+					},
+					{
+						"voltage_ac_l1", 	/* Value name */
+						"V",			/* Unit */
+						0.01,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						300	,			/* Value Pos */
+						3,				/* Value Len */
+						296				/* Timestamp Pos */
+					},
+					{
+						"voltage_ac_l2", 	/* Value name */
+						"V",			/* Unit */
+						0.01,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						328,			/* Value Pos */
+						3,				/* Value Len */
+						324				/* Timestamp Pos */
+					},
+					{
+						"voltage_ac_l3", 	/* Value name */
+						"V",			/* Unit */
+						0.01,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						356,			/* Value Pos */
+						3,				/* Value Len */
+						352				/* Timestamp Pos */
+					},
+					{
+						"current_ac_l1", 	/* Value name */
+						"A",			/* Unit */
+						0.01,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						384,			/* Value Pos */
+						3,				/* Value Len */
+						380				/* Timestamp Pos */
+					},
+					{
+						"current_ac_l2", 	/* Value name */
+						"A",			/* Unit */
+						0.01,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						412,			/* Value Pos */
+						3,				/* Value Len */
+						408				/* Timestamp Pos */
+					},
+					{
+						"current_ac_l3", 	/* Value name */
+						"A",			/* Unit */
+						0.01,			/* Factor */
+						0L,				/* Actual Value */
+						0,				/* Timestamp */
+						440,			/* Value Pos */
+						3,				/* Value Len */
+						436				/* Timestamp Pos */
+					},
+			},
+			12,				/* Value Count */
+	},
 
 	/* 0E A0 FF FF FF FF FF FF 00 01 78 00 $UNKNOWN 00 01 00 00 00 00 $CNT 80 0C 04 FD FF 07 00 00 00 84 03 00 00 $TIME 00 00 00 00 $PASSWORD $CRC 7E $END;*/
 };
+
+/* 7eff03606509a1ffffffffffff000078003f10fb3900000000000009800002005100002000ffff50000e7d339b7e */
+
 
 /** Level1 functions **/
 
