@@ -76,7 +76,7 @@ void in_smadata2plus_connect(struct bluetooth_inverter * inv);
 
 void in_smadata2plus_login(struct bluetooth_inverter * inv);
 
-void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv);
+void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv,time_t time_start,time_t time_end);
 
 void in_smadata2plus_get_model(struct bluetooth_inverter * inv,unsigned char *model_code) ;
 

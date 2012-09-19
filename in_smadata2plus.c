@@ -352,7 +352,7 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 					{
 						"current_ac_l1", 	/* Value name */
 						"A",			/* Unit */
-						0.01,			/* Factor */
+						0.001,			/* Factor */
 						0L,				/* Actual Value */
 						0,				/* Timestamp */
 						384,			/* Value Pos */
@@ -362,7 +362,7 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 					{
 						"current_ac_l2", 	/* Value name */
 						"A",			/* Unit */
-						0.01,			/* Factor */
+						0.001,			/* Factor */
 						0L,				/* Actual Value */
 						0,				/* Timestamp */
 						412,			/* Value Pos */
@@ -372,7 +372,7 @@ struct smadata2_query SMADATA2PLUS_QUERIES[] = {
 					{
 						"current_ac_l3", 	/* Value name */
 						"A",			/* Unit */
-						0.01,			/* Factor */
+						0.001,			/* Factor */
 						0L,				/* Actual Value */
 						0,				/* Timestamp */
 						440,			/* Value Pos */
@@ -785,15 +785,6 @@ void in_smadata2plus_level2_packet_read(unsigned char *buffer, int len,
 
 }
 
-
-
-
-
-
-
-
-
-
 /* Calculate a new fcs given the current fcs and the new data. */
 u_int16_t in_smadata2plus_level2_pppfcs16(u_int16_t fcs, void *_cp, int len) {
 	register unsigned char *cp = (unsigned char *) _cp;
@@ -1071,30 +1062,15 @@ void in_smadata2plus_parse_values(struct smadata2_l1_packet * p1,
 /*
  * Test Query Historic Values
  */
-void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv){
+void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv,time_t time_start,time_t time_end){
 
-	/* Packet Structs */
+	/* Packet structs */
 	struct smadata2_l1_packet recv_pl1 = { 0 };
 	struct smadata2_l2_packet recv_pl2 = {{ 0 }};
 	struct smadata2_l1_packet sent_pl1 = { 0 };
 	struct smadata2_l2_packet sent_pl2 = {{ 0 }};
 
-	/* Get timestamps */
-	time_t day_start, day_end;
-    struct tm *loctime;
-
-    /* Get the current time. */
-    day_start = time (NULL);
-    loctime = localtime (&day_start);
-    loctime->tm_hour = 0;
-    loctime->tm_min = 0;
-    loctime->tm_sec = 0;
-
-    day_start = mktime(loctime);
-    day_start = 0;
-    loctime->tm_mday++;
-    day_end = mktime(loctime);
-
+	/* Clear packets */
 	in_smadata2plus_level1_clear(&sent_pl1);
 	in_smadata2plus_level2_clear(&sent_pl2);
 	/* Set cmdcode */
@@ -1106,15 +1082,15 @@ void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv){
 	/* Set Layer 2 */
 	sent_pl2.ctrl1 = 0x09;
 	sent_pl2.ctrl2 = 0xe0;
-	/* Set L2 Content */
+	/* Set L2 content */
 	unsigned char content[]={0x80, 0x00, 0x02, 0x00,0x70};
 	memcpy(sent_pl2.content,content, sizeof(content));
 	sent_pl2.content_length = sizeof(content);
 	/* Timestamp start */
-	memcpy(sent_pl2.content+sent_pl2.content_length,&day_start, 4);
+	memcpy(sent_pl2.content+sent_pl2.content_length,&time_start, 4);
 	sent_pl2.content_length +=4;
 	/* Timestamp stop */
-	memcpy(sent_pl2.content+sent_pl2.content_length,&day_end, 4);
+	memcpy(sent_pl2.content+sent_pl2.content_length,&time_end, 4);
 	sent_pl2.content_length +=4;
 
 
@@ -1140,32 +1116,32 @@ void in_smadata2plus_get_historic_values(struct bluetooth_inverter * inv){
 		int pos = 12;
 		while(pos < recv_pl2.content_length){
 
-			prev_value = value;
-			prev_timestamp = timestamp;
+//			prev_value = value;
+//			prev_timestamp = timestamp;
 
 			value = 0;
 
 			memcpy(&timestamp,recv_pl2.content+pos,4);
 			memcpy(&value,recv_pl2.content+pos+4,8);
 
-			if (prev_timestamp == 0) {
-				/* first run */
-				diff = 0;
-			}
-			else {
-				/* 1 kWh = 1 W / 1000 * 3600s */
+//			if (prev_timestamp == 0) {
+//				/* first run */
+//				diff = 0;
+//			}
+//			else {
+//				/* 1 kWh = 1 W / 1000 * 3600s */
+//
+//				/* Diff of Wh values */
+//				diff = value-prev_value;
+//				/* Ws */
+//				diff *= 3600;
+//				/* dt */
+//				diff /= timestamp-prev_timestamp;
+//
+//			}
 
-				/* Diff of Wh values */
-				diff = value-prev_value;
-				/* Ws */
-				diff *= 3600;
-				/* dt */
-				diff /= timestamp-prev_timestamp;
 
-			}
-
-
-			printf("timestamp=%d total=%.3lf kWh current=%d Watt \n",timestamp, (value/1000.0),diff);
+			printf("timestamp=%d total=%.3lf kWh \n",timestamp, (value/1000.0));
 
 
 			pos +=12;

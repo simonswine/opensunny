@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <time.h>
 
 #include "opensunny.h"
 
@@ -235,13 +236,13 @@ int main(int argc, char **argv) {
 	/* Enable Logging */
 	log_init();
 
-	parse_config();
-
-	print_help();
-
-	exit(0);
-
-	/* Parsing Args */
+//	parse_config();
+//
+//	print_help();
+//
+//	exit(0);
+//
+//	/* Parsing Args */
 	parse_args(argc, argv);
 
 	/* Inizialize Bluetooth Inverter */
@@ -259,7 +260,28 @@ int main(int argc, char **argv) {
 
 	in_smadata2plus_get_values(&inv);
 
-//	in_smadata2plus_get_historic_values(&inv);
+
+	/* Get timestamps */
+	time_t day_start, day_end;
+    struct tm *loctime;
+
+    /* Get the current time. */
+    day_start = time (NULL);
+    loctime = localtime (&day_start);
+    loctime->tm_hour = 0;
+    loctime->tm_min = 0;
+    loctime->tm_sec = 0;
+
+    day_start = mktime(loctime);
+
+    //printf("\t%d\n\n",day_start);
+    			//1341957600
+    //day_start = 1341957600;
+    loctime->tm_mday++;
+    day_end = mktime(loctime);
+
+
+	in_smadata2plus_get_historic_values(&inv,day_start,day_end);
 
 //	/* Packet Structs */
 //	struct smadata2_l1_packet recv_pl1 = { 0 };
